@@ -4,87 +4,103 @@
 
 - Product: Thoughtforge
 - Document type: Software Requirements Specification
-- Version: 0.1
+- Version: 0.3
 - Date: 2026-03-15
 - Status: Draft for product-definition phase
 
 ## 2. Purpose
 
-Thoughtforge is a local-first desktop application that acts as a second brain for humans and a durable context layer for agents. It must let users think, write, organize, retrieve, and act from their knowledge base in a way that is at least as capable as Obsidian for core note workflows while being materially better for agent collaboration.
+Thoughtforge is a local-first desktop application that acts as a cognitive control plane for humans and agents. It must let users capture evidence, structure intent, track decisions and commitments, manage live focus, understand change over time, and safely collaborate with agents in a way that is at least as capable as Obsidian for core note workflows while being materially better for agent understanding, delegation, and execution.
 
 ## 3. Scope
 
 The product includes:
 
-- Personal knowledge management
+- personal knowledge management and authored evidence capture
 - Markdown-native note authoring and organization
-- Knowledge graph and structured context extraction
-- Agent-readable context and tool surfaces
-- Task, project, and intent management inside the workspace
-- Search, retrieval, resurfacing, and summarization
-- Import/export and migration paths
-- Local-first operation with optional sync and optional remote model use
+- first-class context objects for intent, work, decisions, commitments, and constraints
+- self, world, temporal, attention, and execution models
+- working sets and layered memory
+- a context daemon for continuous state reconciliation
+- knowledge graph and structured context extraction
+- context compilation for agent tasks
+- policy, delegation, approval, and simulation flows
+- agent-readable context and tool surfaces
+- search, retrieval, resurfacing, and summarization
+- external grounding via connected systems
+- import/export and migration paths
+- local-first operation with optional sync and optional remote model use
 
 The product does not initially include:
 
-- Mandatory cloud storage
-- Always-on remote backends
-- Social publishing features
-- Marketplace-scale third-party plugin distribution at launch
+- mandatory cloud storage
+- always-on remote backends
+- social publishing features
+- marketplace-scale third-party plugin distribution at launch
 
 ## 4. Goals
 
 ### 4.1 Product Goals
 
-- Match or exceed Obsidian on core single-user knowledge-work workflows.
-- Make the workspace a better interface to an agentic system than chat alone.
-- Preserve user ownership of data and portability of notes.
-- Support fast thought capture and high-fidelity retrieval.
-- Build trust through permissions, provenance, and reversibility.
+- match or exceed Obsidian on core single-user knowledge-work workflows
+- make the workspace a better interface to an agentic system than chat alone
+- preserve user ownership of data and portability of authored evidence
+- model active state, not just documents
+- reduce the need for users to restate context across sessions
+- support fast thought capture and high-fidelity retrieval
+- build trust through permissions, provenance, freshness, authority, and reversibility
 
 ### 4.2 Non-Goals for MVP
 
-- Full multi-user collaboration suite
-- Mobile-first experience
-- Enterprise admin console
-- Cloud-only AI features
-- Public sharing platform
+- full multi-user collaboration suite
+- mobile-first experience
+- enterprise admin console
+- cloud-only AI features
+- public sharing platform
 
 ## 5. Stakeholders and Personas
 
 ### 5.1 Primary Stakeholders
 
-- Founder or product owner
-- End users building personal or professional second-brain systems
-- Developers building agent capabilities and extensions
+- founder or product owner
+- end users building personal or professional second-brain systems
+- developers building agent capabilities and extensions
 
 ### 5.2 Primary Personas
 
-- Research-heavy operator: needs capture, synthesis, resurfacing, and planning across many sources.
-- Builder with an agentic workflow: wants the agent to understand project context, tasks, code notes, and intent.
-- Knowledge worker with long-lived notes: cares about ownership, portability, and link-based thinking.
-- Power user migrating from Obsidian: expects familiar vault concepts, fast keyboard flows, and plugin-grade extensibility.
+- research-heavy operator: needs capture, synthesis, resurfacing, and planning across many sources
+- builder with an agentic workflow: wants the agent to understand project context, decisions, tasks, code notes, and constraints
+- knowledge worker with long-lived notes: cares about ownership, portability, and link-based thinking
+- power user migrating from Obsidian: expects familiar vault concepts, fast keyboard flows, and extensibility
 
 ## 6. Product Principles
 
-- Local-first by default
-- User-owned data
-- Agent-native but human-legible
-- Structured where valuable, flexible where necessary
-- Security and permissions before autonomy
-- Fast enough to feel invisible
+- local-first by default
+- user-owned data
+- notes are evidence, not the only primitive
+- context objects are first-class
+- live state matters more than static documents
+- separate authored truth from derived inference
+- freshness, authority, provenance, and approval are explicit
+- security and policy before autonomy
+- fast enough to feel invisible
 
 ## 7. Assumptions and Dependencies
 
-- Users will primarily run the app on desktop operating systems.
-- The canonical authored content should remain readable outside the app.
-- Some users will use only local models; others will use hosted models.
-- The system must tolerate external file edits and external sync tools.
-- Optional sync and collaboration will be layered on top of a strong offline core.
+- users will primarily run the app on desktop operating systems
+- canonical authored evidence should remain readable outside the app
+- some users will use only local models while others will use hosted models
+- the system must tolerate external file edits and external sync tools
+- optional sync and collaboration will be layered on top of a strong offline core
+- external grounding will be incremental and connector-based
 
 ## 8. System Overview
 
-Thoughtforge manages one or more local vaults containing Markdown notes, attachments, and app metadata. The application parses those assets, projects structured data into SQLite, extracts entities and links into a knowledge graph, and exposes the resulting context to users and agents. Agents can read workspace context, propose transformations, and perform approved actions through a permissioned command layer.
+Thoughtforge manages one or more local vaults containing Markdown notes, attachments, and app metadata. The application parses those assets into authored evidence, maintains first-class context objects such as intents, projects, decisions, commitments, tasks, resources, constraints, and conversations, and stores live models of self, world, time, attention, and execution policy.
+
+A context daemon continuously observes local events and selected external systems, reconciles new information into the workspace model, and emits state deltas when plans, commitments, or reality shift.
+
+Agents do not operate on raw files directly. They consume task-specific context bundles produced by a context compiler, cite provenance, respect freshness and authority markers, comply with delegation policies, and perform approved actions through a permissioned command layer.
 
 ## 9. Functional Requirements
 
@@ -93,23 +109,23 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 - FR-WV-001 (Must): The system shall allow the user to create, open, close, and switch between vaults.
   Acceptance: A user can select a local folder as a vault and reopen it later without data loss.
 
-- FR-WV-002 (Must): The system shall treat Markdown files and asset folders as the primary user-owned content store.
-  Acceptance: Notes remain readable and editable outside the app.
+- FR-WV-002 (Must): The system shall treat Markdown files and asset folders as the primary user-owned authored evidence store.
+  Acceptance: Evidence remains readable and editable outside the app.
 
-- FR-WV-003 (Must): The system shall store app-specific indexes, caches, and metadata separately from authored note content.
-  Acceptance: Deleting app metadata does not delete note files.
+- FR-WV-003 (Must): The system shall store app-specific indexes, caches, and metadata separately from authored evidence files.
+  Acceptance: Deleting app metadata does not delete evidence files.
 
 - FR-WV-004 (Must): The system shall detect file additions, deletions, renames, and edits made outside the app.
   Acceptance: External edits appear in the UI without manual re-import.
 
-- FR-WV-005 (Must): The system shall maintain an internal vault model with stable note identifiers independent of file path changes.
-  Acceptance: Renaming a note preserves backlinks, tasks, and references.
+- FR-WV-005 (Must): The system shall maintain internal stable identifiers independent of file path changes.
+  Acceptance: Renaming a note preserves backlinks, objects, commitments, and references.
 
 - FR-WV-006 (Should): The system should support multiple root folders or mounted collections inside one workspace.
   Acceptance: A workspace may include configured subroots without flattening the file system.
 
 - FR-WV-007 (Should): The system should support encrypted app secrets and provider credentials.
-  Acceptance: API keys are stored outside note files and can be revoked.
+  Acceptance: API keys are stored outside evidence files and can be revoked.
 
 ### 9.2 Capture and Ingestion
 
@@ -128,10 +144,10 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 - FR-CI-005 (Should): The system should support voice memo or speech-to-note capture through pluggable transcription providers.
   Acceptance: A recorded memo becomes a note with provenance metadata.
 
-- FR-CI-006 (Should): The system should support ingestion pipelines for PDFs, web pages, code files, and transcripts.
-  Acceptance: Imported sources produce notes plus extracted metadata.
+- FR-CI-006 (Should): The system should support ingestion pipelines for PDFs, web pages, code files, transcripts, and meeting recordings.
+  Acceptance: Imported sources produce evidence plus extracted metadata.
 
-### 9.3 Editor and Authoring
+### 9.3 Editor and Evidence Authoring
 
 - FR-ED-001 (Must): The system shall provide a rich Markdown-native editor.
   Acceptance: Users can edit headings, lists, code blocks, links, quotes, tables, and embeds.
@@ -154,48 +170,145 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 - FR-ED-007 (Should): The system should support split panes, tabs, and pinned views.
   Acceptance: Users can work with multiple notes simultaneously.
 
-- FR-ED-008 (Should): The system should support custom typed blocks such as callouts, tasks, entities, and intents.
+- FR-ED-008 (Should): The system should support custom typed blocks such as callouts, evidence excerpts, tasks, decisions, commitments, and constraints.
   Acceptance: Typed blocks render consistently and remain serializable.
 
 - FR-ED-009 (Could): The system could support WYSIWYG and source modes with shared document state.
   Acceptance: Users can toggle views without content corruption.
 
-### 9.4 Search, Retrieval, and Resurfacing
+### 9.4 Context Objects and Relationships
 
-- FR-SR-001 (Must): The system shall support full-text search across note titles, bodies, tags, and metadata.
+- FR-CX-001 (Must): The system shall support first-class context objects for `Intent`, `Project`, `Task`, `Decision`, `Commitment`, `Assumption`, `OpenQuestion`, `Entity`, `Resource`, `Constraint`, `Conversation`, `Delegation`, `Approval`, and `StateDelta`.
+  Acceptance: Each object type can be created, read, updated, linked, and surfaced in dedicated views.
+
+- FR-CX-002 (Must): The system shall assign stable internal identifiers to all context objects.
+  Acceptance: Renaming, moving, or retitling an object does not break references.
+
+- FR-CX-003 (Must): The system shall support explicit relationships between context objects and evidence items.
+  Acceptance: A decision can cite source notes, a commitment can depend on a constraint, and a task can belong to a project.
+
+- FR-CX-004 (Must): The system shall support a working set that represents the user’s currently active focus.
+  Acceptance: A user can view what is active, blocked, stale, noisy, and awaiting review.
+
+- FR-CX-005 (Must): The system shall support decision records with rationale, alternatives, status, and supporting evidence.
+  Acceptance: A decision object exposes what was decided, why, and from which sources.
+
+- FR-CX-006 (Must): The system shall support commitment records with status, owner, due context, and supporting evidence.
+  Acceptance: A commitment can be linked to projects, tasks, or external resources and tracked over time.
+
+- FR-CX-007 (Should): The system should support explicit constraints and "do not break" rules linked to goals, projects, or delegations.
+  Acceptance: Constraints can be retrieved and shown to the user and agent during execution.
+
+- FR-CX-008 (Should): The system should support open questions and assumptions as first-class unresolved state.
+  Acceptance: The system can surface unresolved questions or risky assumptions during planning or execution.
+
+- FR-CX-009 (Should): The system should support promoting freeform notes or blocks into typed context objects.
+  Acceptance: A user or agent can convert a block into a decision, commitment, or resource without losing provenance.
+
+### 9.5 Live Models
+
+- FR-LM-001 (Must): The system shall maintain a self model containing user preferences, communication style, working style, and risk tolerance.
+  Acceptance: The user can inspect and edit core self-model fields.
+
+- FR-LM-002 (Must): The system shall maintain a world model containing people, projects, systems, resources, and dependencies relevant to the user.
+  Acceptance: Objects and resources can be linked into a structured world model.
+
+- FR-LM-003 (Must): The system shall maintain a temporal model containing deadlines, rhythms, validity windows, and review cycles.
+  Acceptance: A task or commitment can carry both scheduling and validity metadata.
+
+- FR-LM-004 (Must): The system shall maintain an attention model containing focus, deferrals, interruptions, blocking conditions, and noise state.
+  Acceptance: The working set view can reflect focus and interruption state.
+
+- FR-LM-005 (Must): The system shall maintain an execution model containing permissions, automation rules, delegation boundaries, and fallback policies.
+  Acceptance: Agent actions are evaluated against execution model state.
+
+- FR-LM-006 (Should): The system should distinguish between user-authored truth, imported external truth, inferred context, and temporary agent state.
+  Acceptance: Context items can display an authority class.
+
+### 9.6 Memory Layers and Bitemporal State
+
+- FR-ML-001 (Must): The system shall maintain distinct memory layers for scratch, session, project, personal, and canonical memory.
+  Acceptance: Data written to one layer can be inspected separately from other layers.
+
+- FR-ML-002 (Must): The system shall require explicit promotion rules for moving information from scratch or session memory into project, personal, or canonical memory.
+  Acceptance: Promotion is auditable and can require user approval.
+
+- FR-ML-003 (Must): The system shall store both recorded time and effective time for important context state.
+  Acceptance: A commitment or directive can show when it was recorded and when it became true.
+
+- FR-ML-004 (Should): The system should support conflict detection across memory layers.
+  Acceptance: A user can inspect conflicting state before promotion.
+
+### 9.7 Context Daemon and State Reconciliation
+
+- FR-CD-001 (Must): The system shall include a context daemon that observes workspace changes continuously.
+  Acceptance: Edits to evidence or objects generate reconciliation events without manual refresh.
+
+- FR-CD-002 (Must): The context daemon shall reconcile selected external connector events into the workspace model.
+  Acceptance: A relevant external change can become a resource, delta, or candidate update in the workspace.
+
+- FR-CD-003 (Must): The context daemon shall emit state deltas when commitments, decisions, plans, or external reality change in materially relevant ways.
+  Acceptance: The user can review what changed and why it matters.
+
+- FR-CD-004 (Should): The context daemon should detect drift between stated plans and observed reality.
+  Acceptance: A stale or broken plan can be surfaced proactively.
+
+- FR-CD-005 (Should): The context daemon should prepare candidate context bundles for likely next actions.
+  Acceptance: A user can open a task or project and see a precompiled suggested bundle.
+
+### 9.8 Context Compilation
+
+- FR-CC-001 (Must): The system shall compile task-specific context bundles for agent work.
+  Acceptance: A bundle can include goal, evidence, objects, recent decisions, commitments, constraints, working set state, and external resources.
+
+- FR-CC-002 (Must): The system shall explain why each item was included in a compiled context bundle.
+  Acceptance: The user can inspect selection rationale after compilation.
+
+- FR-CC-003 (Must): The system shall track freshness, confidence, and authority for facts or context items used by agents.
+  Acceptance: A bundle can flag stale, low-confidence, or non-authoritative inputs.
+
+- FR-CC-004 (Must): The system shall detect missing or conflicting context before an agent acts.
+  Acceptance: A bundle can identify unresolved conflicts or absent required fields.
+
+- FR-CC-005 (Should): The system should consider policy state and delegation boundaries during bundle assembly.
+  Acceptance: A bundle can expose execution limits relevant to the requested action.
+
+### 9.9 Search, Retrieval, and Resurfacing
+
+- FR-SR-001 (Must): The system shall support full-text search across evidence titles, bodies, tags, and metadata.
   Acceptance: Queries return ranked results with highlighted matches.
 
 - FR-SR-002 (Must): The system shall support phrase, prefix, boolean, and scoped search.
-  Acceptance: Users can search by note subset, tag, path, or field.
+  Acceptance: Users can search by evidence subset, tag, path, or field.
 
-- FR-SR-003 (Must): The system shall support backlink discovery and linked context navigation.
-  Acceptance: Users can inspect incoming and outgoing relationships for a note.
+- FR-SR-003 (Must): The system shall support linked-context navigation.
+  Acceptance: Users can inspect incoming and outgoing relationships for notes, objects, and entities.
 
 - FR-SR-004 (Should): The system should support semantic search over indexed chunks.
-  Acceptance: A semantic query returns relevant notes beyond lexical term matches.
+  Acceptance: A semantic query returns relevant evidence beyond lexical term matches.
 
 - FR-SR-005 (Should): The system should support saved searches, smart collections, and dynamic views.
-  Acceptance: A saved query remains live as notes change.
+  Acceptance: A saved query remains live as evidence and objects change.
 
-- FR-SR-006 (Should): The system should support resurfacing features such as "related notes", "stale notes", and "today in memory".
-  Acceptance: The app can generate ranked resurfacing panels from vault state.
+- FR-SR-006 (Should): The system should support resurfacing features such as related notes, stale commitments, decision follow-ups, and today in memory.
+  Acceptance: The app can generate ranked resurfacing panels from workspace state.
 
 - FR-SR-007 (Could): The system could support timeline and event-centric retrieval.
-  Acceptance: Time-bounded queries can filter notes and activities.
+  Acceptance: Time-bounded queries can filter evidence and activities.
 
-### 9.5 Knowledge Graph and Structured Context
+### 9.10 Knowledge Graph and Structured Context
 
-- FR-KG-001 (Must): The system shall construct a note/link graph from wikilinks, embeds, tags, and references.
-  Acceptance: Graph relationships update incrementally when note content changes.
+- FR-KG-001 (Must): The system shall construct a graph from wikilinks, embeds, tags, references, and typed object relationships.
+  Acceptance: Graph relationships update incrementally when evidence or object state changes.
 
 - FR-KG-002 (Must): The system shall maintain extracted entities, aliases, and relationships as a projection layer.
-  Acceptance: Entity views show source notes and confidence.
+  Acceptance: Entity views show source evidence and confidence.
 
 - FR-KG-003 (Should): The system should support user-defined entity types such as person, project, idea, task, system, and goal.
   Acceptance: New entity schemas can be created without code changes.
 
 - FR-KG-004 (Should): The system should support graph-based navigation and neighborhood exploration.
-  Acceptance: Users can expand from a note to related entities and notes.
+  Acceptance: Users can expand from a note or object to related entities, objects, and evidence.
 
 - FR-KG-005 (Should): The system should support provenance for extracted facts.
   Acceptance: Every extracted relation links back to one or more source passages.
@@ -203,56 +316,76 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 - FR-KG-006 (Could): The system could support confidence-weighted graph edges and agent-suggested merges.
   Acceptance: Proposed merges require user confirmation before becoming canonical.
 
-### 9.6 Tasks, Projects, and Intents
+### 9.11 Agent Runtime and Tooling
 
-- FR-TI-001 (Must): The system shall support first-class tasks embedded in notes and surfaced in global task views.
-  Acceptance: A checkbox task is visible both in the note and in aggregated task views.
-
-- FR-TI-002 (Must): The system shall support project entities that group notes, tasks, and decisions.
-  Acceptance: A project page can display linked assets and task state.
-
-- FR-TI-003 (Must): The system shall support explicit intent objects representing goals, plans, and active focus.
-  Acceptance: Users can create an intent and attach notes, tasks, and agent threads to it.
-
-- FR-TI-004 (Should): The system should support status, due dates, owners, and priority metadata.
-  Acceptance: Tasks and projects can be filtered and grouped by these properties.
-
-- FR-TI-005 (Should): The system should support recurring review workflows such as daily planning and weekly review.
-  Acceptance: Review templates can generate or update notes automatically.
-
-### 9.7 Agent Workspace and Tooling
-
-- FR-AG-001 (Must): The system shall expose vault context to internal agents through a typed retrieval and tool layer.
-  Acceptance: The agent can read notes, search, inspect entities, and cite sources.
+- FR-AG-001 (Must): The system shall expose workspace context to internal agents through typed retrieval and tool layers.
+  Acceptance: The agent can read evidence, search, inspect decisions, inspect commitments, inspect constraints, inspect live models, and cite sources.
 
 - FR-AG-002 (Must): The system shall allow agents to propose edits before applying them.
   Acceptance: The user can review a diff or action plan before approval.
 
 - FR-AG-003 (Must): The system shall record provenance for agent-generated outputs.
-  Acceptance: Generated content includes source references and model metadata.
+  Acceptance: Generated content includes source references, context bundle identifiers, and model metadata.
 
-- FR-AG-004 (Must): The system shall support permission scopes for agent actions such as read, write, rename, create, or execute.
+- FR-AG-004 (Must): The system shall support permission scopes for agent actions such as read, write, rename, create, execute, memory promotion, and delegation escalation.
   Acceptance: An action outside the granted scope is blocked.
 
-- FR-AG-005 (Must): The system shall support a non-chat interaction model where the user can invoke agents from notes, selections, tasks, or intents.
+- FR-AG-005 (Must): The system shall support a non-chat interaction model where the user can invoke agents from notes, selections, tasks, decisions, projects, intents, or working set views.
   Acceptance: Agent actions can originate from workspace context without opening a chat thread.
 
-- FR-AG-006 (Should): The system should support MCP host and client capabilities for tool and context interoperability.
+- FR-AG-006 (Must): The system shall present the context bundle used by an agent invocation.
+  Acceptance: The user can inspect what context was provided and why.
+
+- FR-AG-007 (Should): The system should support a shared blackboard for agent or subtask coordination.
+  Acceptance: Multiple coordinated operations can share structured intermediate state without relying on chat history.
+
+- FR-AG-008 (Should): The system should support MCP host and client capabilities for tool and context interoperability.
   Acceptance: External agents can connect to workspace resources using MCP-compatible sessions.
 
-- FR-AG-007 (Should): The system should support local model execution and remote provider execution behind one abstraction.
+- FR-AG-009 (Should): The system should support local model execution and remote provider execution behind one abstraction.
   Acceptance: The user can switch providers without changing higher-level agent workflows.
 
-- FR-AG-008 (Should): The system should support background agent jobs such as summarization, classification, extraction, and plan generation.
+- FR-AG-010 (Should): The system should support background agent jobs such as summarization, extraction, plan generation, stale-context detection, and bundle precomputation.
   Acceptance: Jobs run asynchronously and report status.
 
-- FR-AG-009 (Could): The system could support agent memories distinct from authored notes.
-  Acceptance: Agent scratchpads remain inspectable and deletable.
+### 9.12 Delegation, Approval, and Simulation
 
-### 9.8 Sync, Collaboration, and Conflict Handling
+- FR-DP-001 (Must): The system shall support a delegation ladder from suggest-only to bounded autonomous execution.
+  Acceptance: Delegation level is visible and adjustable per workflow or agent.
+
+- FR-DP-002 (Must): The system shall support explicit approval objects and approval requests.
+  Acceptance: A user can review and approve or deny a requested action or promotion.
+
+- FR-DP-003 (Must): The system shall support policy rules that constrain agent actions by scope, context, object type, or external tool.
+  Acceptance: A prohibited action is blocked with an inspectable reason.
+
+- FR-DP-004 (Should): The system should simulate risky or multi-step plans before execution.
+  Acceptance: A user can inspect expected changes, affected objects, and external side effects before approval.
+
+- FR-DP-005 (Should): The system should support rollback guidance or reversible execution where technically feasible.
+  Acceptance: A user can inspect which actions are reversible before approving execution.
+
+### 9.13 External Grounding and Connectors
+
+- FR-EG-001 (Must): The system shall support connector-based ingestion or mirroring of external systems as resources.
+  Acceptance: External items can appear as first-class resources linked to workspace objects.
+
+- FR-EG-002 (Should): The system should support calendar grounding for meetings, deadlines, and scheduled work.
+  Acceptance: A calendar event can be linked to tasks, projects, or meeting notes.
+
+- FR-EG-003 (Should): The system should support git and GitHub grounding for code work.
+  Acceptance: Commits, branches, pull requests, or issues can be linked to projects or tasks.
+
+- FR-EG-004 (Should): The system should support browser research and transcript grounding.
+  Acceptance: Web captures or transcripts can preserve source URL, timestamps, and provenance.
+
+- FR-EG-005 (Should): The system should support freshness tracking for external resources.
+  Acceptance: A stale external resource is marked as stale in retrieval or context compilation.
+
+### 9.14 Sync, Collaboration, and Conflict Handling
 
 - FR-SC-001 (Must): The system shall remain fully usable offline.
-  Acceptance: Note creation, editing, search, and local agent flows work without network access.
+  Acceptance: Evidence authoring, object editing, search, and local agent flows work without network access.
 
 - FR-SC-002 (Must): The system shall handle concurrent changes from multiple processes without silent data loss.
   Acceptance: Conflicting updates are merged or surfaced explicitly.
@@ -266,12 +399,12 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 - FR-SC-005 (Could): The system could support presence, cursors, and shared sessions.
   Acceptance: Live co-editing state is visible in collaborative mode.
 
-### 9.9 Import, Export, and Interoperability
+### 9.15 Import, Export, and Interoperability
 
 - FR-IE-001 (Must): The system shall import existing Markdown vaults with minimal restructuring.
   Acceptance: Obsidian-style vaults open with working links and attachments.
 
-- FR-IE-002 (Must): The system shall export authored notes and attachments without vendor lock-in.
+- FR-IE-002 (Must): The system shall export authored evidence and attachments without vendor lock-in.
   Acceptance: A user can leave the product with human-readable files intact.
 
 - FR-IE-003 (Should): The system should import metadata from common PKM formats such as frontmatter and task syntaxes.
@@ -281,34 +414,40 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
   Acceptance: Plugins can register commands, views, and background jobs.
 
 - FR-IE-005 (Should): The system should support open-in-default-app and open-with-external-editor flows.
-  Acceptance: The user can edit a note externally and return without desync.
+  Acceptance: The user can edit evidence externally and return without desync.
 
-### 9.10 Security, Permissions, and Privacy
+### 9.16 Security, Permissions, and Privacy
 
 - FR-SP-001 (Must): The system shall require explicit user approval for destructive or external side-effecting agent actions.
-  Acceptance: An agent cannot delete notes or execute tools without approval.
+  Acceptance: An agent cannot delete evidence or execute external tools without approval.
 
 - FR-SP-002 (Must): The system shall separate trusted core code from less-trusted frontend and plugin execution contexts.
   Acceptance: Sensitive operations are mediated through permissioned commands.
 
 - FR-SP-003 (Must): The system shall support provider-level data sharing controls.
-  Acceptance: Users can disable sending vault content to remote models by policy or workspace setting.
+  Acceptance: Users can disable sending workspace content to remote models by policy or workspace setting.
 
-- FR-SP-004 (Must): The system shall allow users to inspect which notes, passages, or entities were exposed to a model call.
+- FR-SP-004 (Must): The system shall allow users to inspect which evidence, passages, objects, models, or resources were exposed to a model call.
   Acceptance: Retrieval context for a request is visible after the action completes.
 
-- FR-SP-005 (Should): The system should support redaction rules and no-send folders.
+- FR-SP-005 (Must): The system shall apply explicit approval rules for promotion into durable memory layers.
+  Acceptance: Promotion events are gated and auditable.
+
+- FR-SP-006 (Must): The system shall expose what the context daemon observes and allow per-source controls.
+  Acceptance: A user can enable, disable, or inspect observed sources.
+
+- FR-SP-007 (Should): The system should support redaction rules and no-send folders.
   Acceptance: Marked content is excluded from remote inference requests.
 
-- FR-SP-006 (Should): The system should support encrypted local secret storage.
-  Acceptance: Credentials are stored outside plain-text note files.
+- FR-SP-008 (Should): The system should support encrypted local secret storage.
+  Acceptance: Credentials are stored outside plain-text evidence files.
 
-### 9.11 Observability and Evaluation
+### 9.17 Observability and Evaluation
 
-- FR-OE-001 (Must): The system shall log user-visible agent actions, approvals, denials, and failures.
-  Acceptance: A user can audit what the agent attempted and what changed.
+- FR-OE-001 (Must): The system shall log user-visible agent actions, approvals, denials, memory promotions, daemon reconciliations, and failures.
+  Acceptance: A user can audit what the agent or daemon attempted and what changed.
 
-- FR-OE-002 (Should): The system should support local evaluation harnesses for retrieval quality and task completion quality.
+- FR-OE-002 (Should): The system should support local evaluation harnesses for retrieval quality, context compilation quality, delegation safety, and task completion quality.
   Acceptance: Sample benchmarks can be run against a test vault.
 
 - FR-OE-003 (Should): The system should support optional anonymous telemetry with explicit opt-in.
@@ -317,31 +456,34 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 ## 10. Non-Functional Requirements
 
 - NFR-001 Performance: The app shall open an existing medium-sized vault in under 3 seconds on a modern laptop after initial indexing.
-- NFR-002 Search latency: Lexical search shall return initial results in under 150 ms for the 95th percentile on a vault with 100,000 notes or note chunks.
-- NFR-003 Save latency: Ordinary typing shall feel real-time with autosave that does not visibly block the editor.
-- NFR-004 Offline availability: Core note authoring and retrieval shall work without network access.
-- NFR-005 Reliability: The system shall protect against corruption during crashes through journaling, transactional metadata updates, and recovery flows.
-- NFR-006 Portability: Authored note content shall remain usable in plain Markdown-oriented tools.
-- NFR-007 Extensibility: Core features shall expose stable internal interfaces so that plugin support can be added without major rewrites.
-- NFR-008 Accessibility: Desktop UX shall target WCAG 2.2 AA where applicable, including keyboard navigation, screen-reader-readable controls, and contrast compliance.
-- NFR-009 Security: Sensitive actions shall cross explicit trust boundaries and permission checks.
-- NFR-010 Privacy: The user shall be able to run the product without any cloud account.
-- NFR-011 Observability: Errors shall be capturable through local logs and structured diagnostics.
-- NFR-012 Cross-platform support: The architecture shall support macOS, Windows, and Linux even if release sequencing starts with macOS.
+- NFR-002 Search latency: Lexical search shall return initial results in under 150 ms for the 95th percentile on a vault with 100,000 evidence items or chunks.
+- NFR-003 Context compilation latency: A standard context bundle shall compile in under 500 ms for the 95th percentile before model invocation.
+- NFR-004 Daemon reconciliation latency: An ordinary local change shall be reflected in the live model within 1 second for the 95th percentile.
+- NFR-005 Save latency: Ordinary typing shall feel real-time with autosave that does not visibly block the editor.
+- NFR-006 Offline availability: Core evidence authoring, object editing, live-model editing, and retrieval shall work without network access.
+- NFR-007 Reliability: The system shall protect against corruption during crashes through journaling, transactional metadata updates, and recovery flows.
+- NFR-008 Portability: Authored evidence shall remain usable in plain Markdown-oriented tools.
+- NFR-009 Extensibility: Core features shall expose stable internal interfaces so that plugin support can be added without major rewrites.
+- NFR-010 Accessibility: Desktop UX shall target WCAG 2.2 AA where applicable, including keyboard navigation, screen-reader-readable controls, and contrast compliance.
+- NFR-011 Security: Sensitive actions shall cross explicit trust boundaries and permission checks.
+- NFR-012 Privacy: The user shall be able to run the product without any cloud account.
+- NFR-013 Observability: Errors shall be capturable through local logs and structured diagnostics.
+- NFR-014 Provenance quality: Agent-visible outputs shall retain source references and context bundle identifiers.
+- NFR-015 Cross-platform support: The architecture shall support macOS, Windows, and Linux even if release sequencing starts with macOS.
 
 ## 11. External Interface Requirements
 
 ### 11.1 User Interface
 
-- The application shall provide a desktop interface with sidebar navigation, note panes, command palette, search, graph views, and inspector panels.
+- The application shall provide a desktop interface with sidebar navigation, evidence panes, object views, command palette, search, graph views, working set dashboards, policy panels, and inspector panels.
 - The application shall be keyboard-first, with mouse support as a complement.
 - The application shall support configurable themes and typography without requiring a plugin.
 
 ### 11.2 File System Interface
 
-- The app shall read and write notes and attachments within configured vault roots.
+- The app shall read and write evidence and attachments within configured vault roots.
 - The app shall watch vault file changes through platform-native file watching where available.
-- The app shall isolate internal metadata from authored content.
+- The app shall isolate internal metadata from authored evidence.
 
 ### 11.3 AI Provider Interface
 
@@ -349,28 +491,48 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 - The app shall support a local HTTP interface for Ollama-compatible calls.
 - The app shall support pluggable remote providers through explicit credential configuration.
 
-### 11.4 Agent Tool Interface
+### 11.4 External Connector Interface
 
-- The app shall expose typed tools for search, read note, write note, extract entities, resolve links, list tasks, and apply structured transformations.
+- The app shall support connector adapters for calendar, git, issue tracker, browser, and transcript sources.
+- The app shall store connector state and provenance separately from authored evidence.
+
+### 11.5 Agent Tool Interface
+
+- The app shall expose typed tools for search, read evidence, inspect objects, inspect live models, compile context bundles, create tasks, create decisions, create commitments, request approvals, and apply structured transformations.
 - The app shall support MCP-compatible resource and tool exposure.
 
 ## 12. Data Requirements
 
-### 12.1 Canonical Authored Data
+### 12.1 Canonical Authored Evidence
 
 - Notes shall be stored as Markdown files.
 - Metadata shall use frontmatter and structured inline fields where possible.
 - Attachments shall be stored as ordinary files under workspace-controlled asset paths.
 
-### 12.2 Projected Data
+### 12.2 Canonical Context Objects
 
-- SQLite shall store indexes, graph edges, task projections, embeddings metadata, and app state.
-- Projected data shall be rebuildable from canonical files plus explicit sync state where applicable.
+- Intents, projects, tasks, decisions, commitments, constraints, resources, conversations, delegations, approvals, and state deltas shall have canonical local records with stable IDs.
+- Canonical context objects shall be linkable to authored evidence and to each other.
 
-### 12.3 Audit Data
+### 12.3 Live Models
 
-- Agent actions, approvals, and diffs shall be stored with timestamps and workspace-local identifiers.
-- Users shall be able to clear non-canonical history without losing authored content.
+- Self, world, temporal, attention, and execution models shall have canonical local records.
+- Live models shall be inspectable and editable where policy permits.
+
+### 12.4 Memory Layers
+
+- Scratch and session memory shall be separable from project, personal, and canonical memory.
+- Promotions between memory layers shall be auditable.
+
+### 12.5 Projected Data
+
+- SQLite shall store indexes, graph edges, object projections, working set projections, freshness metadata, embeddings metadata, and app state.
+- Projected data shall be rebuildable from canonical evidence, canonical context objects, live models, and explicit sync state where applicable.
+
+### 12.6 Audit and Provenance Data
+
+- Agent actions, approvals, denials, memory promotions, daemon reconciliations, and diffs shall be stored with timestamps and workspace-local identifiers.
+- Users shall be able to clear non-canonical history without losing authored evidence.
 
 ## 13. Constraints
 
@@ -378,38 +540,51 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 - The architecture must not assume permanent internet connectivity.
 - The product must keep trust boundaries explicit because it will execute agent workflows.
 - The editor model must support both human authoring and structured machine reasoning.
+- The system must not silently elevate generated summaries into canonical truth.
+- The system must not allow the daemon or agent runtime to perform high-risk actions without policy and review controls.
 
 ## 14. MVP Acceptance Criteria
 
 MVP is acceptable when all of the following are true:
 
 - A user can open an existing Markdown vault and continue working without migration pain.
-- Note creation, editing, linking, search, and backlinks are production-usable.
-- Tasks, projects, and intents can be created and queried across the workspace.
-- The agent can search, read, summarize, and propose edits with provenance.
-- The user can approve or deny write actions at a granular level.
-- External note edits do not corrupt the workspace model.
+- Evidence creation, editing, linking, search, and backlinks are production-usable.
+- Intents, projects, tasks, decisions, commitments, and constraints can be created and queried across the workspace.
+- Self, world, temporal, and attention models can be inspected and updated at a useful baseline level.
+- The working set can show what is active, blocked, stale, noisy, and waiting for review.
+- The context daemon can reconcile ordinary workspace changes and surface meaningful deltas.
+- The agent can compile a context bundle, explain it, and act from it with provenance.
+- The user can approve or deny write actions, delegation escalation, and memory promotions at a granular level.
+- External evidence edits do not corrupt the workspace model.
 - The app remains useful with no cloud account and no network connection.
 
 ## 15. Future Release Themes
 
-- Real-time shared workspaces
-- Advanced semantic retrieval and memory ranking
-- Plugin marketplace
-- Mobile companion apps
-- Publishing and read-only portals
-- Team policy controls and enterprise deployment
+- real-time shared workspaces
+- advanced semantic retrieval and memory ranking
+- plugin marketplace
+- mobile companion apps
+- publishing and read-only portals
+- team policy controls and enterprise deployment
 
 ## 16. Open Risks
 
-- Rich editor plus Markdown fidelity can become a source of complexity and user distrust if round-tripping is imperfect.
-- Agent autonomy can damage trust if permissioning and provenance are weak.
-- Sync and collaboration can dominate engineering cost if attempted too early.
-- Over-structuring the knowledge model can slow capture and reduce adoption.
+- rich editor plus Markdown fidelity can become a source of complexity and user distrust if round-tripping is imperfect
+- agent autonomy can damage trust if permissioning, provenance, freshness handling, and delegation controls are weak
+- sync and collaboration can dominate engineering cost if attempted too early
+- over-structuring the knowledge model can slow capture and reduce adoption
+- under-structuring the product can leave the agent reconstructing context from scratch forever
+- an intrusive or opaque daemon can feel like surveillance rather than assistance
 
 ## 17. Glossary
 
-- Vault: A user-owned collection of notes, assets, and metadata roots.
+- Vault: A user-owned collection of evidence, assets, and metadata roots.
+- Evidence: Human-authored or imported material such as notes, clips, transcripts, or attachments.
+- Context object: A first-class structured record such as an intent, decision, commitment, or resource.
+- Live model: A structured representation of the self, world, time, attention, or execution state.
+- Working set: The currently active set of goals, tasks, constraints, and evidence relevant to near-term work.
+- Context daemon: A service that continuously reconciles changes into the live workspace model.
+- Context compiler: A service that assembles task-specific bundles for agent work.
 - Projection: Derived data optimized for search, graph queries, or UI use.
 - Intent: A first-class object representing desired outcome, focus, or plan.
 - Agent-native: Designed so software agents can understand and operate on workspace context directly.

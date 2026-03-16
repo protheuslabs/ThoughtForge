@@ -1,28 +1,109 @@
 # Planning Decisions
 
-These planning docs now assume `Thoughtforge` is the selected working name and that the stack and architecture choices from the initial recommendation set are adopted as the baseline.
+These planning docs now assume `Thoughtforge` is being built as a cognitive control plane for a human-agent system, not a note app with AI layered on top.
 
 ## 1. Decisions You Do Not Want to Leave Fuzzy
 
 These are the decisions teams usually postpone and then pay for later.
 
-### 1.1 Canonical Storage Contract
+### 1.1 Canonical Evidence Contract
 
-Decide exactly what is canonical:
+Decide exactly what counts as canonical authored evidence:
 
-- Markdown note body
+- Markdown body format
 - frontmatter shape
 - attachment path rules
 - block ID encoding
-- task syntax
+- source metadata conventions
 
-If this drifts, import/export and editor trust both break.
+If this drifts, import/export and authoring trust both break.
 
-### 1.2 Stable Identity Strategy
+### 1.2 Canonical Object Model
 
-Decide how notes, blocks, entities, tasks, and intents get stable IDs. Do not use file paths or titles as identity.
+Decide the first-class object contract for:
 
-### 1.3 Agent Trust and Approval Model
+- intents
+- projects
+- tasks
+- decisions
+- commitments
+- assumptions
+- open questions
+- entities
+- resources
+- constraints
+- conversations
+- delegations
+- approvals
+- state deltas
+
+This is the real product model. If it is fuzzy, the agent will never have stable ground truth.
+
+### 1.3 Live Model Schema
+
+Decide the schema and edit model for:
+
+- self model
+- world model
+- temporal model
+- attention model
+- execution model
+
+These cannot be hidden prompt templates. They need durable structure and clear ownership.
+
+### 1.4 Stable Identity Strategy
+
+Decide how evidence items, blocks, entities, tasks, decisions, delegations, and intents get stable IDs. Do not use file paths or titles as identity.
+
+### 1.5 Memory Layer Policy
+
+Decide what belongs in:
+
+- scratch memory
+- session memory
+- project memory
+- personal memory
+- canonical memory
+
+Then decide what can be auto-written, what can be promoted, and what always requires approval.
+
+### 1.6 Context Daemon Contract
+
+Decide:
+
+- what event sources it observes
+- how reconciliation works
+- when it proposes versus applies updates
+- how it surfaces drift and state deltas
+- what is always human-reviewed
+
+This is one of the core differentiators.
+
+### 1.7 Context Compiler Contract
+
+Decide how a context bundle is assembled:
+
+- what inputs it considers
+- how it ranks evidence versus objects versus recent events
+- how it explains its choices
+- how it flags stale, conflicting, or missing information
+- how policy state affects inclusion
+
+This is the heart of the agent experience.
+
+### 1.8 Authority, Freshness, Confidence, and Bitemporal Schema
+
+Decide:
+
+- what counts as authoritative
+- how freshness decays
+- how confidence is represented
+- how conflict resolution is surfaced
+- how `recorded_at` and `effective_at` are modeled
+
+Without this, old notes will be treated like live directives.
+
+### 1.9 Agent Trust, Delegation, and Approval Model
 
 Decide:
 
@@ -30,21 +111,48 @@ Decide:
 - what actions require approval
 - what actions are never allowed
 - how scope inheritance works inside a workflow
+- how delegation ladders work
+- how memory promotion approval works
 
 This is core product design, not polish.
 
-### 1.4 Retrieval Quality Evaluation
+### 1.10 Simulation Semantics
+
+Decide:
+
+- which plans must be simulated before execution
+- what counts as a risky workflow
+- how simulations estimate impact
+- how simulations are shown to the user
+
+### 1.11 External Grounding Strategy
+
+Decide which systems become first-class resources in v1:
+
+- calendar
+- git and GitHub
+- issue trackers
+- browser research
+- meeting transcripts
+
+Then decide whether they are mirrored, linked, or partially cached locally.
+
+### 1.12 Retrieval and Evaluation Harness
 
 You are building a system whose value depends on whether an agent actually understands the workspace.
 
 That means you need a benchmark suite early:
 
 - retrieval relevance tests
-- note-to-entity extraction accuracy tests
+- object extraction accuracy tests
+- decision and constraint recall tests
 - task and intent planning quality tests
 - citation and provenance validation
+- stale-context failure tests
+- delegation safety tests
+- simulation-versus-real-outcome comparison
 
-### 1.5 Migration Strategy from Obsidian
+### 1.13 Migration Strategy from Obsidian
 
 This matters more than it looks.
 
@@ -53,9 +161,10 @@ Decide:
 - which Obsidian conventions are first-class
 - how unsupported plugin syntax is handled
 - whether import rewrites files or overlays metadata
+- how notes are promoted into context objects
 - what breaks and how it is reported
 
-### 1.6 Plugin Security Model
+### 1.14 Plugin Security Model
 
 Decide whether plugins run:
 
@@ -65,7 +174,7 @@ Decide whether plugins run:
 
 Do not expose raw filesystem or shell access casually.
 
-### 1.7 Local Versus Remote AI Policy
+### 1.15 Local Versus Remote AI Policy
 
 Decide product modes:
 
@@ -75,21 +184,23 @@ Decide product modes:
 
 Then decide how no-send folders, redaction, and provider approvals work.
 
-### 1.8 Sync Business Logic
+### 1.16 Sync Business Logic
 
 If sync exists later, decide whether the sync layer is:
 
-- file sync aware
+- evidence-file aware
+- context-object aware
+- live-model aware
 - CRDT document aware
 - projection aware
 
 Do not let sync become an accidental rewrite of the storage model.
 
-### 1.9 Trademark and Naming Risk
+### 1.17 Trademark and Naming Risk
 
 Be careful with anything too close to "Obsidian". Similar names may create avoidable trademark and brand confusion.
 
-### 1.10 Licensing and Commercial Strategy
+### 1.18 Licensing and Commercial Strategy
 
 Decide early:
 
@@ -105,33 +216,36 @@ Decide early:
 Outcome:
 
 - lock product thesis
-- lock canonical storage contract
+- lock canonical evidence, object, and live-model contracts
 - lock architecture and repo layout
 - define benchmark vaults and acceptance criteria
 
-### Phase 1: Core Local Vault
+### Phase 1: Core Local Control Plane
 
 Outcome:
 
 - vault open/create
-- Markdown-native editor
+- Markdown-native authoring
 - wikilinks and backlinks
 - search
 - graph basics
-- tasks and projects
+- first-class objects for intents, tasks, projects, decisions, commitments, constraints, and approvals
+- working set views
+- self, world, temporal, and attention models
 - external edit detection
 
 Exit criteria:
 
-- power user can migrate a small Obsidian vault and keep working
+- a power user can migrate a small Obsidian vault and turn active work into explicit context objects without losing flow
 
-### Phase 2: Agent-Native Workspace
+### Phase 2: Agent-Native Supervision
 
 Outcome:
 
-- note-aware command palette
-- intent objects
-- agent read/search/summarize flows
+- context-aware command palette
+- context compiler
+- scratch and session memory
+- delegation ladder
 - proposed edits with diff review
 - provenance and audit log
 - local model integration
@@ -140,21 +254,35 @@ Exit criteria:
 
 - a user can work with the agent from the workspace without depending on chat
 
-### Phase 3: Structured Knowledge Layer
+### Phase 3: Continuous Symbiosis
 
 Outcome:
 
-- typed entities
-- relationship extraction
-- semantic retrieval
-- resurfacing and review workflows
-- more powerful project and goal views
+- context daemon
+- state delta generation
+- drift detection
+- freshness and authority scoring
+- proactive bundle preparation
+- calendar, git, issues, and meeting grounding
 
 Exit criteria:
 
-- the system produces materially better context retrieval than plain note search
+- the system continuously tracks what changed and prepares likely next-step context without the user restating it
 
-### Phase 4: Collaboration and Ecosystem
+### Phase 4: Bounded Autonomy
+
+Outcome:
+
+- policy engine
+- simulation layer
+- bounded autonomous workflows
+- richer delegation and approval flows
+
+Exit criteria:
+
+- agents can execute meaningful multi-step work under explicit policy with strong user trust
+
+### Phase 5: Collaboration and Ecosystem
 
 Outcome:
 
@@ -172,19 +300,25 @@ Exit criteria:
 ### User Value Metrics
 
 - time from launch to first captured thought
-- frequency of backlink and search usage
+- time from raw note to usable context object
+- percentage of sessions where the working set is reviewed or updated
+- percentage of proactive suggestions accepted
 - percentage of agent outputs accepted without heavy rewrite
-- number of tasks or plans created from workspace context
-- return rate to resurfaced notes
+- number of decisions, tasks, or plans created from workspace context
+- reduction in repeated context restatement across sessions
 
 ### System Quality Metrics
 
 - vault open time
 - search latency
+- context compilation latency
+- context daemon reconciliation latency
 - indexing throughput
 - crash recovery success rate
 - percentage of agent edits with valid citations
-- false-positive entity extraction rate
+- false-positive object extraction rate
+- stale-context failure rate
+- delegation safety failure rate
 
 ## 4. Biggest Product Risks
 
@@ -204,21 +338,31 @@ If the main experience becomes chat-first, the product loses its thesis.
 
 Mitigation:
 
-- center notes, graph, tasks, and intent views
-- let agents act from context panels, selections, and documents
+- center working sets, projects, decisions, commitments, and intents
+- let agents act from context panels, selections, dashboards, and policies
 
-### Risk 3: Too Much Structure Too Early
+### Risk 3: Remaining Document-Centric
+
+If the product never promotes state beyond freeform notes, the agent will always be reconstructing context from scratch.
+
+Mitigation:
+
+- make core objects first-class
+- make promotion from notes to objects effortless
+- compile context bundles from both evidence and state
+
+### Risk 4: Too Much Structure Too Early
 
 If every thought must fit a schema, capture becomes slow and unnatural.
 
 Mitigation:
 
-- keep freeform notes primary
-- project structure out of notes rather than forcing it up front
+- keep freeform capture primary
+- project structure out of evidence rather than forcing it up front
 
-### Risk 4: Agent Trust Failure
+### Risk 5: Agent Trust Failure
 
-One bad destructive action can permanently damage adoption.
+One bad destructive or overconfident action can permanently damage adoption.
 
 Mitigation:
 
@@ -226,8 +370,20 @@ Mitigation:
 - reversible changes
 - provenance
 - least privilege by default
+- simulation for risky workflows
 
-### Risk 5: Sync Complexity Explosion
+### Risk 6: Surveillance or Intrusion Feel
+
+If the context daemon feels invasive or opaque, users will not trust it.
+
+Mitigation:
+
+- make observed sources explicit
+- make daemon actions inspectable
+- default to conservative reconciliation
+- allow per-source disable controls
+
+### Risk 7: Sync Complexity Explosion
 
 Sync can consume the roadmap if started too early.
 
@@ -241,13 +397,19 @@ Mitigation:
 These are the defaults to lock for implementation:
 
 - Product name: Thoughtforge, pending formal trademark and domain clearance
-- App type: desktop-first, macOS-first, cross-platform architecture
-- Canonical data: Markdown plus frontmatter
+- Product model: cognitive control plane for a human-agent system
+- Canonical evidence: Markdown plus frontmatter
+- First-class objects: intents, projects, tasks, decisions, commitments, assumptions, open questions, resources, constraints, conversations, delegations, approvals, state deltas
+- Live models: self, world, temporal, attention, execution
 - Native core: Rust
 - Shell: Tauri 2
 - UI: React 19 plus TypeScript
 - Editor: Tiptap plus ProseMirror
 - Search: SQLite FTS5 first, semantic second
+- Context assembly: dedicated context compiler
+- Continuous state: dedicated context daemon
+- Memory model: explicit layered memory with promotion rules
+- Autonomy model: policy engine plus delegation ladder plus simulation layer
 - Sync: not in MVP
 - Agent runtime: local-first with provider abstraction
 - Plugin model: limited internal plugin API first, public marketplace later
@@ -256,9 +418,9 @@ These are the defaults to lock for implementation:
 
 These are the best follow-up planning questions after this document set:
 
-1. What is the exact canonical markdown and metadata contract?
+1. What is the exact canonical evidence, object, and live-model contract?
 2. What are the top five agent actions we want to make magical in v1?
-3. What are the import compatibility guarantees for Obsidian vaults?
-4. What approval UX do we want for agent edits and external actions?
-5. What is the minimum plugin API needed for launch?
+3. Which live-model fields are user-controlled versus daemon-derived?
+4. What approval UX do we want for agent edits, external actions, delegation escalation, and memory promotion?
+5. Which external systems are in the first grounding wave?
 6. What benchmark vault will we use to measure "agent understands my workspace"?
