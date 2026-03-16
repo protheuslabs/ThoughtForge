@@ -14,6 +14,8 @@ Build a cognitive control plane that:
 - compiles task-specific context bundles for agents
 - preserves provenance, freshness, confidence, and authority
 - allows agents to act only through policy-governed typed tools
+- represents visual workspaces and structured views in open, machine-writable formats
+- exposes deterministic automation surfaces beyond the GUI
 
 That combination pushes the architecture toward:
 
@@ -141,6 +143,7 @@ Recommended split:
 - Application services: commands, orchestration, workflows, review gates
 - Adapters: filesystem, SQLite, model providers, MCP, OS integrations, sync backends, external connectors
 - Projections: search index, graph index, working set index, freshness index, authority index, embeddings index, audit history
+- Native artifact layer: serializers and validators for Markdown, visual workspace docs, and structured view definitions
 
 ## 4. System Topology
 
@@ -188,6 +191,7 @@ Responsibilities:
 - block structure
 - markdown round-tripping
 - source passages and evidence ingestion
+- native artifact serialization and validation for supported open workspace formats
 
 ### 5.3 Context Object Context
 
@@ -260,6 +264,7 @@ Responsibilities:
 - explain why each piece of context was selected
 - detect missing information
 - rank evidence, objects, recent events, and external resources together
+- emit artifact-safe outputs when the target is a structured view or visual workspace
 
 ### 5.11 Policy and Delegation Context
 
@@ -316,6 +321,14 @@ Responsibilities:
 - view contribution
 - background jobs
 - restricted API exposure
+
+### 5.17 CLI and Automation Context
+
+Responsibilities:
+
+- deterministic command-line access to core workspace operations
+- machine-readable output for agent OS orchestration
+- parity for essential read and write flows outside the GUI
 
 ## 6. Data Model Strategy
 
@@ -388,6 +401,8 @@ Derived data should live in SQLite:
 - freshness and authority markers
 - semantic chunk metadata
 - audit and job history
+
+Open native artifacts should be stored in explicit serializable formats and validated before durable write.
 
 Important rule:
 
@@ -471,6 +486,10 @@ Required agent tools:
 - validate_context_freshness
 - simulate_plan
 - open_intent
+- create_structured_view
+- update_structured_view
+- create_visual_workspace_doc
+- validate_native_artifact
 
 ### 8.2 Permission Model
 
@@ -595,6 +614,7 @@ crates/
   simulation/          # Plan preview and risk estimation
   indexer/             # Search, graph, freshness, working set projections
   agent-runtime/       # Model adapters, tools, provenance, approvals
+  cli/                 # Deterministic command-line interface
   connectors/          # Calendar, git, issues, browser, meeting adapters
   sync/                # Yjs and sync adapters
   plugin-host/         # Sandbox and extension APIs
@@ -619,8 +639,10 @@ Lock these before implementation accelerates:
 8. freshness, confidence, authority, and bitemporal schema
 9. permission and approval model for agent actions
 10. simulation semantics for risky workflows
-11. plugin sandbox shape
-12. sync boundary between evidence files, context objects, live models, and CRDT documents
+11. native artifact schemas and validation rules
+12. CLI contract and machine-readable output format
+13. plugin sandbox shape
+14. sync boundary between evidence files, context objects, live models, and CRDT documents
 
 ## 14. Alternatives Considered
 

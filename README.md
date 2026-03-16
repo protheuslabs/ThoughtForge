@@ -68,6 +68,7 @@ Core shape:
 - Context compiler: a service that assembles the right bundle for a specific job from evidence, objects, recent events, external state, and policy context.
 - Policy engine: a guardrail layer that governs delegation, memory promotion, external actions, and bounded autonomy.
 - Simulation layer: a preview step for risky or multi-step agent plans before real execution.
+- Native artifacts: open visual documents and structured view definitions that agents can generate, validate, and edit safely.
 
 ## Core Product Pillars
 
@@ -92,6 +93,8 @@ MVP should focus on a sharp core:
 - A delegation ladder from suggest-only to bounded autonomy with explicit approval requirements.
 - Fast search across evidence, context objects, tasks, decisions, commitments, entities, and relationships.
 - Agent command surface for summarize, extract entities, update project state, generate plans, create tasks, propose decisions, and request approvals.
+- At least one open visual workspace format and one structured view definition format with schema validation.
+- A deterministic CLI for agent OS integration and workspace automation.
 - Import path from Obsidian-style vaults.
 - Local model support and remote model adapter support.
 
@@ -150,6 +153,8 @@ docs/
 - Use SQLite for structured context, working sets, memory layers, policy state, and rebuildable projections.
 - Continuously reconcile state through a context daemon rather than rebuilding context from scratch on every prompt.
 - Compile task-specific context bundles instead of dumping raw retrieval output into prompts.
+- Prefer open, schema-validated native artifacts over opaque internal-only workspace formats.
+- Expose a deterministic CLI so the agent OS can operate the workspace without UI-only affordances.
 - Build delegation, approvals, freshness, authority, provenance, and simulation into the core model before broad autonomy.
 
 ## Reference Material

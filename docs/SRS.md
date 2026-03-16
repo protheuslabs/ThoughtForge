@@ -26,6 +26,8 @@ The product includes:
 - context compilation for agent tasks
 - policy, delegation, approval, and simulation flows
 - agent-readable context and tool surfaces
+- open visual workspace artifacts and structured view definitions
+- deterministic command-line automation
 - search, retrieval, resurfacing, and summarization
 - external grounding via connected systems
 - import/export and migration paths
@@ -176,6 +178,12 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - FR-ED-009 (Could): The system could support WYSIWYG and source modes with shared document state.
   Acceptance: Users can toggle views without content corruption.
 
+- FR-ED-010 (Should): The system should support visual workspace documents stored in an open, serializable format.
+  Acceptance: A visual workspace can be created, edited, versioned, and inspected outside the app.
+
+- FR-ED-011 (Should): The system should support schema-validated native artifact generation for supported workspace formats.
+  Acceptance: An invalid generated artifact is blocked or repaired before durable write.
+
 ### 9.4 Context Objects and Relationships
 
 - FR-CX-001 (Must): The system shall support first-class context objects for `Intent`, `Project`, `Task`, `Decision`, `Commitment`, `Assumption`, `OpenQuestion`, `Entity`, `Resource`, `Constraint`, `Conversation`, `Delegation`, `Approval`, and `StateDelta`.
@@ -296,6 +304,9 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - FR-SR-007 (Could): The system could support timeline and event-centric retrieval.
   Acceptance: Time-bounded queries can filter evidence and activities.
 
+- FR-SR-008 (Should): The system should support structured view definitions for filters, grouping, formulas, and dashboards over evidence and context objects.
+  Acceptance: A structured view definition remains human-readable, editable, and executable by the app and agents.
+
 ### 9.10 Knowledge Graph and Structured Context
 
 - FR-KG-001 (Must): The system shall construct a graph from wikilinks, embeds, tags, references, and typed object relationships.
@@ -347,6 +358,9 @@ Agents do not operate on raw files directly. They consume task-specific context 
 
 - FR-AG-010 (Should): The system should support background agent jobs such as summarization, extraction, plan generation, stale-context detection, and bundle precomputation.
   Acceptance: Jobs run asynchronously and report status.
+
+- FR-AG-011 (Must): The system shall validate agent-generated native artifacts against format schemas before applying them.
+  Acceptance: Generated Markdown, visual documents, and view definitions are checked before durable write.
 
 ### 9.12 Delegation, Approval, and Simulation
 
@@ -416,6 +430,12 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - FR-IE-005 (Should): The system should support open-in-default-app and open-with-external-editor flows.
   Acceptance: The user can edit evidence externally and return without desync.
 
+- FR-IE-006 (Should): The system should support import and export of open visual workspace artifacts and structured view definitions.
+  Acceptance: Visual documents and view specifications can be moved without vendor-locked binary conversion.
+
+- FR-IE-007 (Must): The system shall expose a deterministic command-line interface for core workspace automation.
+  Acceptance: Notes, objects, views, and agent-safe operations can be created or queried through CLI commands with stable outputs.
+
 ### 9.16 Security, Permissions, and Privacy
 
 - FR-SP-001 (Must): The system shall require explicit user approval for destructive or external side-effecting agent actions.
@@ -470,6 +490,7 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - NFR-013 Observability: Errors shall be capturable through local logs and structured diagnostics.
 - NFR-014 Provenance quality: Agent-visible outputs shall retain source references and context bundle identifiers.
 - NFR-015 Cross-platform support: The architecture shall support macOS, Windows, and Linux even if release sequencing starts with macOS.
+- NFR-016 Artifact validity: Supported native artifact formats shall be schema-validated before durable writes are committed.
 
 ## 11. External Interface Requirements
 
@@ -478,6 +499,7 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - The application shall provide a desktop interface with sidebar navigation, evidence panes, object views, command palette, search, graph views, working set dashboards, policy panels, and inspector panels.
 - The application shall be keyboard-first, with mouse support as a complement.
 - The application shall support configurable themes and typography without requiring a plugin.
+- The application shall provide editors or inspectors for supported visual workspace artifacts and structured views.
 
 ### 11.2 File System Interface
 
@@ -501,6 +523,16 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - The app shall expose typed tools for search, read evidence, inspect objects, inspect live models, compile context bundles, create tasks, create decisions, create commitments, request approvals, and apply structured transformations.
 - The app shall support MCP-compatible resource and tool exposure.
 
+### 11.6 Native Artifact Interface
+
+- The app shall expose supported native artifact formats through documented schemas or deterministic serialization contracts.
+- The app shall support validation of agent-generated or externally produced native artifacts before durable write.
+
+### 11.7 Command-Line Interface
+
+- The app shall provide a command-line interface for deterministic workspace automation and integration.
+- The CLI shall support machine-readable output modes for agent or OS orchestration.
+
 ## 12. Data Requirements
 
 ### 12.1 Canonical Authored Evidence
@@ -508,6 +540,7 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - Notes shall be stored as Markdown files.
 - Metadata shall use frontmatter and structured inline fields where possible.
 - Attachments shall be stored as ordinary files under workspace-controlled asset paths.
+- Supported visual workspace documents shall be stored in open, serializable formats.
 
 ### 12.2 Canonical Context Objects
 
@@ -534,6 +567,11 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - Agent actions, approvals, denials, memory promotions, daemon reconciliations, and diffs shall be stored with timestamps and workspace-local identifiers.
 - Users shall be able to clear non-canonical history without losing authored evidence.
 
+### 12.7 Structured View Definitions
+
+- Structured views, filters, formulas, and dashboard definitions shall be stored in human-readable or otherwise openly serializable formats.
+- View definitions shall be executable by the app, inspectable by the user, and writable by agents subject to validation.
+
 ## 13. Constraints
 
 - The system must preserve portability and avoid hard vendor lock-in.
@@ -554,6 +592,8 @@ MVP is acceptable when all of the following are true:
 - The working set can show what is active, blocked, stale, noisy, and waiting for review.
 - The context daemon can reconcile ordinary workspace changes and surface meaningful deltas.
 - The agent can compile a context bundle, explain it, and act from it with provenance.
+- The system can create, validate, and persist at least one open visual artifact type and one structured view definition type.
+- The CLI can perform core read and write automation for notes, objects, or views with deterministic output.
 - The user can approve or deny write actions, delegation escalation, and memory promotions at a granular level.
 - External evidence edits do not corrupt the workspace model.
 - The app remains useful with no cloud account and no network connection.
