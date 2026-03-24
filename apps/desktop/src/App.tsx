@@ -1,4 +1,4 @@
-import { startTransition, useDeferredValue, useEffect, useState } from 'react'
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
 import './App.css'
 
 type EditorMode = 'source' | 'preview' | 'split'
@@ -18,7 +18,41 @@ type WorkspaceCommand = {
   name: string
   hotkey: string
   description: string
-  run: () => void
+}
+
+type CaptureTarget = 'inbox' | 'daily' | 'active'
+
+type DailyNoteConfig = {
+  folder: string
+  fileNamePattern: string
+  headingTemplate: string
+}
+
+type MetadataField = {
+  key: string
+  value: string
+}
+
+type NoteReference = {
+  raw: string
+  target: string
+  blockId: string | null
+  embedded: boolean
+}
+
+type SlashCommand = {
+  id: string
+  name: string
+  description: string
+  keywords: string[]
+  insert: (now: Date) => string
+}
+
+type SlashState = {
+  isOpen: boolean
+  query: string
+  replaceStart: number
+  replaceEnd: number
 }
 
 const INITIAL_NOTES: VaultNote[] = [
@@ -120,6 +154,51 @@ Linked from [[Project Dossier]] and [[Agent Context Model]].`,
 
 const LAYOUT_STORAGE_KEY = 'thoughtforge.workspace.layout.v1'
 const COMMAND_BINDINGS_KEY = 'thoughtforge.command.bindings.v1'
+const DAILY_NOTE_CONFIG_KEY = 'thoughtforge.capture.daily.v1'
+
+const DEFAULT_DAILY_NOTE_CONFIG: DailyNoteConfig = {
+  folder: '00 Daily',
+  fileNamePattern: '%Y-%m-%d',
+  headingTemplate: '# Daily Note - {date}',
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  {
+    id: 'slash:task',
+    name: 'Task',
+    description: 'Insert an unchecked task item',
+    keywords: ['todo', 'task', 'checklist'],
+    insert: () => '- [ ] ',
+  },
+  {
+    id: 'slash:callout-info',
+    name: 'Callout (Info)',
+    description: 'Insert an info callout block',
+    keywords: ['callout', 'info', 'note'],
+    insert: () => '> [!info] Context\n> \n',
+  },
+  {
+    id: 'slash:decision',
+    name: 'Decision Block',
+    description: 'Insert a structured decision template',
+    keywords: ['decision', 'rationale', 'adr'],
+    insert: () => '## Decision\nstatus:: proposed\nrationale:: \nalternatives:: \n',
+  },
+  {
+    id: 'slash:evidence',
+    name: 'Evidence Excerpt',
+    description: 'Insert evidence metadata and quote scaffold',
+    keywords: ['evidence', 'excerpt', 'source'],
+    insert: () => 'source:: \ncaptured_at:: \n\n> \n',
+  },
+  {
+    id: 'slash:block-anchor',
+    name: 'Block Anchor',
+    description: 'Insert a stable block anchor marker',
+    keywords: ['block', 'anchor', 'reference'],
+    insert: (now) => ` ^block-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`,
+  },
+]
 
 type PersistedWorkspaceLayout = {
   notes: VaultNote[]
@@ -179,21 +258,236 @@ function saveCommandBindings(bindings: CommandBindings): void {
   }
 }
 
+function loadDailyNoteConfig(): DailyNoteConfig {
+  try {
+    const raw = window.localStorage.getItem(DAILY_NOTE_CONFIG_KEY)
+    if (!raw) {
+      return DEFAULT_DAILY_NOTE_CONFIG
+    }
+    const parsed = JSON.parse(raw) as Partial<DailyNoteConfig>
+    return {
+      folder: parsed.folder?.trim() || DEFAULT_DAILY_NOTE_CONFIG.folder,
+      fileNamePattern:
+        parsed.fileNamePattern?.trim() || DEFAULT_DAILY_NOTE_CONFIG.fileNamePattern,
+      headingTemplate:
+        parsed.headingTemplate?.trim() || DEFAULT_DAILY_NOTE_CONFIG.headingTemplate,
+    }
+  } catch {
+    return DEFAULT_DAILY_NOTE_CONFIG
+  }
+}
+
+function saveDailyNoteConfig(config: DailyNoteConfig): void {
+  try {
+    window.localStorage.setItem(DAILY_NOTE_CONFIG_KEY, JSON.stringify(config))
+  } catch {
+    // no-op: best effort persistence
+  }
+}
+
 function normalizeLink(raw: string): string {
   const noAlias = raw.split('|')[0] ?? raw
   const noAnchor = noAlias.split('#')[0] ?? noAlias
-  return noAnchor.trim().replace(/^\.\//, '').replace(/\.md$/i, '').toLowerCase()
+  return noAnchor
+    .trim()
+    .replace(/^\.\//, '')
+    .replace(/^\//, '')
+    .replace(/\.md$/i, '')
+    .toLowerCase()
+}
+
+function parseReferenceTarget(raw: string): { target: string; blockId: string | null } {
+  const aliasStripped = (raw.split('|')[0] ?? raw).trim()
+  const blockSplit = aliasStripped.split('#^')
+  if (blockSplit.length > 1) {
+    const target = normalizeLink(blockSplit[0] ?? '')
+    const blockId = (blockSplit[1] ?? '').trim().toLowerCase()
+    return { target, blockId: blockId || null }
+  }
+  const headingStripped = aliasStripped.split('#')[0] ?? aliasStripped
+  return { target: normalizeLink(headingStripped), blockId: null }
+}
+
+function isExternalReference(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  return (
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('mailto:') ||
+    normalized.startsWith('obsidian://') ||
+    normalized.startsWith('thoughtforge://')
+  )
+}
+
+function extractReferences(markdown: string): NoteReference[] {
+  const refs: NoteReference[] = []
+  const dedup = new Set<string>()
+
+  const wikiPattern = /\[\[([^[\]]+)\]\]/g
+  let wikiMatch = wikiPattern.exec(markdown)
+  while (wikiMatch) {
+    const raw = (wikiMatch[1] ?? '').trim()
+    const index = wikiMatch.index ?? 0
+    const embedded = index > 0 && markdown[index - 1] === '!'
+    const { target, blockId } = parseReferenceTarget(raw)
+    if (target) {
+      const dedupKey = `${target}|${blockId ?? ''}|${embedded}|${raw}`
+      if (!dedup.has(dedupKey)) {
+        dedup.add(dedupKey)
+        refs.push({ raw, target, blockId, embedded })
+      }
+    }
+    wikiMatch = wikiPattern.exec(markdown)
+  }
+
+  const mdPattern = /\]\(([^)]+)\)/g
+  let mdMatch = mdPattern.exec(markdown)
+  while (mdMatch) {
+    const raw = (mdMatch[1] ?? '').trim()
+    const endBracketIndex = (mdMatch.index ?? 0) + 1
+    const openBracketIndex = markdown.lastIndexOf('[', endBracketIndex)
+    const embedded = openBracketIndex > 0 && markdown[openBracketIndex - 1] === '!'
+    if (!raw || isExternalReference(raw)) {
+      mdMatch = mdPattern.exec(markdown)
+      continue
+    }
+    const { target, blockId } = parseReferenceTarget(raw)
+    if (target) {
+      const dedupKey = `${target}|${blockId ?? ''}|${embedded}|${raw}`
+      if (!dedup.has(dedupKey)) {
+        dedup.add(dedupKey)
+        refs.push({ raw, target, blockId, embedded })
+      }
+    }
+    mdMatch = mdPattern.exec(markdown)
+  }
+
+  return refs
 }
 
 function extractLinks(markdown: string): string[] {
   const links = new Set<string>()
-  const wikiPattern = /\[\[([^[\]]+)\]\]/g
-  let match = wikiPattern.exec(markdown)
-  while (match) {
-    links.add(normalizeLink(match[1] ?? ''))
-    match = wikiPattern.exec(markdown)
+  for (const ref of extractReferences(markdown)) {
+    if (ref.target) {
+      links.add(ref.target)
+    }
   }
   return [...links]
+}
+
+function extractFrontmatterFields(markdown: string): MetadataField[] {
+  const lines = markdown.split('\n')
+  if ((lines[0] ?? '').trim() !== '---') {
+    return []
+  }
+  const fields: MetadataField[] = []
+  let closed = false
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i] ?? ''
+    if (line.trim() === '---') {
+      closed = true
+      break
+    }
+    const splitIndex = line.indexOf(':')
+    if (splitIndex <= 0) {
+      continue
+    }
+    const key = line.slice(0, splitIndex).trim()
+    const value = line.slice(splitIndex + 1).trim()
+    if (key && value) {
+      fields.push({ key, value })
+    }
+  }
+  return closed ? fields : []
+}
+
+function isMetadataKey(key: string): boolean {
+  return /^[A-Za-z0-9._-]+$/.test(key)
+}
+
+function extractInlineMetadataFields(markdown: string): MetadataField[] {
+  const fields: MetadataField[] = []
+  let inFrontmatter = false
+  let checkedFrontmatter = false
+  let inCode = false
+  const lines = markdown.split('\n')
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!checkedFrontmatter) {
+      checkedFrontmatter = true
+      if (trimmed === '---') {
+        inFrontmatter = true
+        continue
+      }
+    }
+    if (inFrontmatter) {
+      if (trimmed === '---') {
+        inFrontmatter = false
+      }
+      continue
+    }
+    if (trimmed.startsWith('```')) {
+      inCode = !inCode
+      continue
+    }
+    if (inCode) {
+      continue
+    }
+
+    const splitIndex = line.indexOf('::')
+    if (splitIndex <= 0) {
+      continue
+    }
+    const key = line.slice(0, splitIndex).trim()
+    const value = line.slice(splitIndex + 2).trim()
+    if (key && value && isMetadataKey(key)) {
+      fields.push({ key, value })
+    }
+  }
+  return fields
+}
+
+function extractBlockAnchors(markdown: string): string[] {
+  const anchors = new Set<string>()
+  let inCode = false
+  for (const line of markdown.split('\n')) {
+    const trimmed = line.trimEnd()
+    if (trimmed.startsWith('```')) {
+      inCode = !inCode
+      continue
+    }
+    if (inCode || !trimmed.includes('^')) {
+      continue
+    }
+    const anchorMatch = trimmed.match(/\^([A-Za-z0-9_-]+)\s*$/)
+    if (anchorMatch?.[1]) {
+      anchors.add(anchorMatch[1].toLowerCase())
+    }
+  }
+  return [...anchors]
+}
+
+function formatDateByPattern(date: Date, pattern: string): string {
+  const year = String(date.getFullYear())
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return pattern.replaceAll('%Y', year).replaceAll('%m', month).replaceAll('%d', day)
+}
+
+function dailyNotePathForDate(config: DailyNoteConfig, date: Date): string {
+  const folder = config.folder.trim() || DEFAULT_DAILY_NOTE_CONFIG.folder
+  const pattern = config.fileNamePattern.trim() || DEFAULT_DAILY_NOTE_CONFIG.fileNamePattern
+  return `${folder}/${formatDateByPattern(date, pattern)}.md`
+}
+
+function dailyHeadingForDate(config: DailyNoteConfig, date: Date): string {
+  const dateToken = formatDateByPattern(
+    date,
+    config.fileNamePattern.trim() || DEFAULT_DAILY_NOTE_CONFIG.fileNamePattern,
+  )
+  const template = config.headingTemplate.trim() || DEFAULT_DAILY_NOTE_CONFIG.headingTemplate
+  return template.replaceAll('{date}', dateToken)
 }
 
 function noteAliases(note: VaultNote): string[] {
@@ -405,6 +699,19 @@ function App() {
   const [quickSwitcherQuery, setQuickSwitcherQuery] = useState<string>('')
   const [statusLine, setStatusLine] = useState<string>('Ready')
   const [commandHistory, setCommandHistory] = useState<string[]>(bootLayout?.commandHistory ?? [])
+  const [dailyNoteConfig, setDailyNoteConfig] = useState<DailyNoteConfig>(() =>
+    loadDailyNoteConfig(),
+  )
+  const [captureOpen, setCaptureOpen] = useState<boolean>(false)
+  const [captureText, setCaptureText] = useState<string>('')
+  const [captureTarget, setCaptureTarget] = useState<CaptureTarget>('inbox')
+  const [slashState, setSlashState] = useState<SlashState>({
+    isOpen: false,
+    query: '',
+    replaceStart: 0,
+    replaceEnd: 0,
+  })
+  const editorRef = useRef<HTMLTextAreaElement | null>(null)
 
   const deferredExplorerQuery = useDeferredValue(explorerQuery)
   const deferredCommandQuery = useDeferredValue(commandQuery)
@@ -413,6 +720,12 @@ function App() {
   const activeNote = notes.find((note) => note.id === activeNoteId) ?? notes[0]
   const activeAliases = activeNote ? noteAliases(activeNote) : []
   const activeLinks = activeNote ? extractLinks(activeNote.content) : []
+  const activeReferences = activeNote ? extractReferences(activeNote.content) : []
+  const activeEmbeds = activeReferences.filter((reference) => reference.embedded)
+  const activeBlockReferences = activeReferences.filter((reference) => reference.blockId !== null)
+  const activeFrontmatter = activeNote ? extractFrontmatterFields(activeNote.content) : []
+  const activeInlineMetadata = activeNote ? extractInlineMetadataFields(activeNote.content) : []
+  const activeBlockAnchors = activeNote ? extractBlockAnchors(activeNote.content) : []
   const notesById = new Map(notes.map((note) => [note.id, note]))
 
   const backlinks = notes.filter((note) => {
@@ -437,6 +750,18 @@ function App() {
     }
     const value = deferredQuickSwitcherQuery.toLowerCase()
     return note.title.toLowerCase().includes(value) || note.path.toLowerCase().includes(value)
+  })
+
+  const filteredSlashCommands = SLASH_COMMANDS.filter((command) => {
+    if (!slashState.query.trim()) {
+      return true
+    }
+    const query = slashState.query.toLowerCase()
+    return (
+      command.name.toLowerCase().includes(query) ||
+      command.description.toLowerCase().includes(query) ||
+      command.keywords.some((keyword) => keyword.includes(query))
+    )
   })
 
   function openNote(noteId: string, source: string, trackHistory = true): void {
@@ -520,7 +845,30 @@ function App() {
     })
   }
 
-  function updateActiveContent(content: string): void {
+  function updateSlashState(content: string, cursor: number): void {
+    const safeCursor = Math.max(0, Math.min(cursor, content.length))
+    const lineStart = content.lastIndexOf('\n', Math.max(0, safeCursor - 1)) + 1
+    const lineUntilCursor = content.slice(lineStart, safeCursor)
+    const slashOffset = lineUntilCursor.indexOf('/')
+    if (slashOffset === -1) {
+      setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
+      return
+    }
+    const prefix = lineUntilCursor.slice(0, slashOffset)
+    if (prefix.trim() !== '') {
+      setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
+      return
+    }
+    const query = lineUntilCursor.slice(slashOffset + 1).trim().toLowerCase()
+    setSlashState({
+      isOpen: true,
+      query,
+      replaceStart: lineStart + slashOffset,
+      replaceEnd: safeCursor,
+    })
+  }
+
+  function updateActiveContent(content: string, cursor?: number): void {
     if (!activeNote) {
       return
     }
@@ -529,7 +877,147 @@ function App() {
         note.id === activeNote.id ? { ...note, content, updatedAt: formatNow() } : note,
       ),
     )
+    if (typeof cursor === 'number') {
+      updateSlashState(content, cursor)
+    }
     setStatusLine(`Autosaved ${activeNote.title}`)
+  }
+
+  function titleFromPath(path: string): string {
+    const stem = path.split('/').pop()?.replace(/\.md$/i, '') ?? path
+    return stem
+      .split(/[-_]/g)
+      .filter(Boolean)
+      .map((part) => part[0]?.toUpperCase() + part.slice(1))
+      .join(' ')
+  }
+
+  function ensureNoteByPath(path: string, heading: string): VaultNote {
+    const existing = notes.find((note) => normalizeLink(note.path) === normalizeLink(path))
+    if (existing) {
+      return existing
+    }
+    let seed = notes.length + 1
+    let id = `note-generated-${seed}`
+    while (notes.some((note) => note.id === id)) {
+      seed += 1
+      id = `note-generated-${seed}`
+    }
+    const newNote: VaultNote = {
+      id,
+      path,
+      title: titleFromPath(path),
+      content: `${heading}\n\n`,
+      tags: ['#capture'],
+      updatedAt: formatNow(),
+    }
+    setNotes((current) => [newNote, ...current])
+    return newNote
+  }
+
+  function openTodayDailyNote(): void {
+    const today = new Date()
+    const path = dailyNotePathForDate(dailyNoteConfig, today)
+    const note = ensureNoteByPath(path, dailyHeadingForDate(dailyNoteConfig, today))
+    openNote(note.id, 'daily note')
+    setStatusLine(`Opened daily note ${path}`)
+  }
+
+  function appendCaptureEntry(target: CaptureTarget, text: string): void {
+    const trimmed = text.trim()
+    if (!trimmed) {
+      setStatusLine('Capture text is empty')
+      return
+    }
+
+    const timestamp = formatNow()
+    const entry = `- [${timestamp}] ${trimmed}`
+    let targetPath: string
+    let heading: string
+    if (target === 'inbox') {
+      targetPath = '00 Inbox/Inbox.md'
+      heading = '# Inbox'
+    } else if (target === 'daily') {
+      const now = new Date()
+      targetPath = dailyNotePathForDate(dailyNoteConfig, now)
+      heading = dailyHeadingForDate(dailyNoteConfig, now)
+    } else if (activeNote) {
+      targetPath = activeNote.path
+      heading = `# ${activeNote.title}`
+    } else {
+      targetPath = '00 Inbox/Inbox.md'
+      heading = '# Inbox'
+    }
+
+    const note = ensureNoteByPath(targetPath, heading)
+    setNotes((current) =>
+      current.map((item) => {
+        if (item.id !== note.id) {
+          return item
+        }
+        const prefix = item.content.endsWith('\n') ? '' : '\n'
+        return {
+          ...item,
+          content: `${item.content}${prefix}${entry}\n`,
+          updatedAt: formatNow(),
+        }
+      }),
+    )
+    openNote(note.id, `capture:${target}`)
+    setCaptureOpen(false)
+    setCaptureText('')
+    setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
+    setStatusLine(`Captured to ${targetPath}`)
+  }
+
+  function insertAtCursor(template: string, label: string): void {
+    if (!activeNote) {
+      return
+    }
+    const editor = editorRef.current
+    const start = editor?.selectionStart ?? activeNote.content.length
+    const end = editor?.selectionEnd ?? start
+    const before = activeNote.content.slice(0, start)
+    const after = activeNote.content.slice(end)
+    const next = `${before}${template}${after}`
+    updateActiveContent(next)
+    setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
+    setStatusLine(`Inserted ${label}`)
+
+    requestAnimationFrame(() => {
+      const field = editorRef.current
+      if (!field) {
+        return
+      }
+      const nextCursor = before.length + template.length
+      field.focus()
+      field.selectionStart = nextCursor
+      field.selectionEnd = nextCursor
+    })
+  }
+
+  function insertSlashCommand(command: SlashCommand): void {
+    if (!activeNote) {
+      return
+    }
+    const replacement = command.insert(new Date())
+    const before = activeNote.content.slice(0, slashState.replaceStart)
+    const after = activeNote.content.slice(slashState.replaceEnd)
+    const next = `${before}${replacement}${after}`
+    updateActiveContent(next)
+    setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
+    setStatusLine(`Inserted ${command.name}`)
+
+    requestAnimationFrame(() => {
+      const field = editorRef.current
+      if (!field) {
+        return
+      }
+      const nextCursor = before.length + replacement.length
+      field.focus()
+      field.selectionStart = nextCursor
+      field.selectionEnd = nextCursor
+    })
   }
 
   function togglePin(noteId: string): void {
@@ -541,8 +1029,80 @@ function App() {
     })
   }
 
+  function executeCommandById(commandId: string): void {
+    switch (commandId) {
+      case 'command-palette:open':
+        setCommandPaletteOpen(true)
+        return
+      case 'switcher:open':
+        setQuickSwitcherOpen(true)
+        return
+      case 'app:go-back':
+        navigateBack()
+        return
+      case 'app:go-forward':
+        navigateForward()
+        return
+      case 'file-explorer:new-file':
+        createNote()
+        return
+      case 'markdown:toggle-preview':
+        setEditorMode((mode) => {
+          if (mode === 'source') {
+            return 'preview'
+          }
+          if (mode === 'preview') {
+            return 'split'
+          }
+          return 'source'
+        })
+        return
+      case 'workspace:split-vertical':
+        setEditorMode('split')
+        return
+      case 'app:toggle-left-sidebar':
+        setLeftSidebarVisible((value) => !value)
+        return
+      case 'app:toggle-right-sidebar':
+        setRightSidebarVisible((value) => !value)
+        return
+      case 'theme:toggle-light-dark':
+        setTheme((value) => (value === 'dark' ? 'light' : 'dark'))
+        return
+      case 'daily-note:open-today':
+        openTodayDailyNote()
+        return
+      case 'capture:append-inbox':
+        setCaptureTarget('inbox')
+        setCaptureOpen(true)
+        return
+      case 'capture:append-daily':
+        setCaptureTarget('daily')
+        setCaptureOpen(true)
+        return
+      case 'capture:append-active-note':
+        setCaptureTarget('active')
+        setCaptureOpen(true)
+        return
+      case 'insert:callout':
+        insertAtCursor('> [!info] Context\n> \n', 'callout')
+        return
+      case 'insert:decision-block':
+        insertAtCursor(
+          '## Decision\nstatus:: proposed\nrationale:: \nalternatives:: \n',
+          'decision block',
+        )
+        return
+      case 'insert:task':
+        insertAtCursor('- [ ] ', 'task')
+        return
+      default:
+        setStatusLine(`Unknown command ${commandId}`)
+    }
+  }
+
   function executeCommand(command: WorkspaceCommand): void {
-    command.run()
+    executeCommandById(command.id)
     setCommandPaletteOpen(false)
     setCommandQuery('')
     setCommandHistory((current) => [`${command.id} (${command.hotkey})`, ...current].slice(0, 8))
@@ -574,79 +1134,102 @@ function App() {
       name: 'Open command palette',
       hotkey: commandHotkey('command-palette:open', 'Mod+P'),
       description: 'Search and execute workspace commands',
-      run: () => setCommandPaletteOpen(true),
     },
     {
       id: 'switcher:open',
       name: 'Open quick switcher',
       hotkey: commandHotkey('switcher:open', 'Mod+O'),
       description: 'Find and open a note by title',
-      run: () => setQuickSwitcherOpen(true),
     },
     {
       id: 'app:go-back',
       name: 'Go back',
       hotkey: commandHotkey('app:go-back', 'Mod+['),
       description: 'Open previous note from navigation history',
-      run: () => navigateBack(),
     },
     {
       id: 'app:go-forward',
       name: 'Go forward',
       hotkey: commandHotkey('app:go-forward', 'Mod+]'),
       description: 'Open next note from navigation history',
-      run: () => navigateForward(),
     },
     {
       id: 'file-explorer:new-file',
       name: 'Create new note',
       hotkey: commandHotkey('file-explorer:new-file', 'Mod+N'),
       description: 'Create a markdown note in inbox',
-      run: () => createNote(),
     },
     {
       id: 'markdown:toggle-preview',
       name: 'Toggle source/preview mode',
       hotkey: commandHotkey('markdown:toggle-preview', 'Mod+E'),
       description: 'Switch editor mode',
-      run: () =>
-        setEditorMode((mode) => {
-          if (mode === 'source') {
-            return 'preview'
-          }
-          if (mode === 'preview') {
-            return 'split'
-          }
-          return 'source'
-        }),
     },
     {
       id: 'workspace:split-vertical',
       name: 'Open split editor',
       hotkey: commandHotkey('workspace:split-vertical', 'Mod+Backslash'),
       description: 'Show source and preview side by side',
-      run: () => setEditorMode('split'),
     },
     {
       id: 'app:toggle-left-sidebar',
       name: 'Toggle left sidebar',
       hotkey: commandHotkey('app:toggle-left-sidebar', 'Mod+Alt+Left'),
       description: 'Show or hide file navigation',
-      run: () => setLeftSidebarVisible((value) => !value),
     },
     {
       id: 'app:toggle-right-sidebar',
       name: 'Toggle right sidebar',
       hotkey: commandHotkey('app:toggle-right-sidebar', 'Mod+Alt+Right'),
       description: 'Show or hide backlinks and inspector',
-      run: () => setRightSidebarVisible((value) => !value),
     },
     {
       id: 'theme:toggle-light-dark',
       name: 'Toggle theme',
       hotkey: commandHotkey('theme:toggle-light-dark', 'Mod+Shift+L'),
       description: 'Switch dark and light UI modes',
-      run: () => setTheme((value) => (value === 'dark' ? 'light' : 'dark')),
+    },
+    {
+      id: 'daily-note:open-today',
+      name: 'Open today daily note',
+      hotkey: commandHotkey('daily-note:open-today', 'Mod+Shift+D'),
+      description: 'Open or create today daily note using configured folder and format',
+    },
+    {
+      id: 'capture:append-inbox',
+      name: 'Capture to inbox',
+      hotkey: commandHotkey('capture:append-inbox', 'Mod+Shift+I'),
+      description: 'Open quick capture targeting inbox',
+    },
+    {
+      id: 'capture:append-daily',
+      name: 'Capture to daily note',
+      hotkey: commandHotkey('capture:append-daily', 'Mod+Shift+J'),
+      description: 'Open quick capture targeting today daily note',
+    },
+    {
+      id: 'capture:append-active-note',
+      name: 'Capture to active note',
+      hotkey: commandHotkey('capture:append-active-note', 'Mod+Shift+K'),
+      description: 'Open quick capture targeting currently active note',
+    },
+    {
+      id: 'insert:callout',
+      name: 'Insert callout',
+      hotkey: commandHotkey('insert:callout', 'Mod+Shift+C'),
+      description: 'Insert an info callout template at cursor',
+    },
+    {
+      id: 'insert:decision-block',
+      name: 'Insert decision block',
+      hotkey: commandHotkey('insert:decision-block', 'Mod+Shift+R'),
+      description: 'Insert structured decision metadata fields',
+    },
+    {
+      id: 'insert:task',
+      name: 'Insert task',
+      hotkey: commandHotkey('insert:task', 'Mod+Shift+T'),
+      description: 'Insert checklist item at cursor',
     },
   ]
 
@@ -667,6 +1250,10 @@ function App() {
   }, [theme])
 
   useEffect(() => {
+    saveDailyNoteConfig(dailyNoteConfig)
+  }, [dailyNoteConfig])
+
+  useEffect(() => {
     const keyboundCommands = commands
       .filter((command) => command.hotkey.trim() !== '')
       .map((command) => ({ id: command.id, hotkey: command.hotkey }))
@@ -676,7 +1263,18 @@ function App() {
         return
       }
       if (isEditableTarget(event.target)) {
-        const safeInEditor = ['file-explorer:new-file']
+        const safeInEditor = [
+          'file-explorer:new-file',
+          'command-palette:open',
+          'switcher:open',
+          'capture:append-inbox',
+          'capture:append-daily',
+          'capture:append-active-note',
+          'daily-note:open-today',
+          'insert:callout',
+          'insert:decision-block',
+          'insert:task',
+        ]
         const matched = keyboundCommands.find((entry) => hotkeyMatches(event, entry.hotkey))
         if (matched && safeInEditor.includes(matched.id)) {
           event.preventDefault()
@@ -766,6 +1364,18 @@ function App() {
           </button>
           <button type="button" onClick={() => setCommandPaletteOpen(true)}>
             Command Palette
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCaptureTarget('inbox')
+              setCaptureOpen(true)
+            }}
+          >
+            Capture
+          </button>
+          <button type="button" onClick={() => openTodayDailyNote()}>
+            Daily
           </button>
           <button type="button" onClick={() => createNote()}>
             New Note
@@ -877,14 +1487,59 @@ function App() {
             <div className={editorMode === 'split' ? 'editor-panels split' : 'editor-panels'}>
               {(editorMode === 'source' || editorMode === 'split') && (
                 <textarea
+                  ref={editorRef}
                   className="source-editor"
                   value={activeNote.content}
-                  onChange={(event) => updateActiveContent(event.target.value)}
+                  onChange={(event) =>
+                    updateActiveContent(event.target.value, event.currentTarget.selectionStart)
+                  }
+                  onClick={(event) =>
+                    updateSlashState(event.currentTarget.value, event.currentTarget.selectionStart)
+                  }
+                  onKeyUp={(event) =>
+                    updateSlashState(event.currentTarget.value, event.currentTarget.selectionStart)
+                  }
+                  onKeyDown={(event) => {
+                    if (!slashState.isOpen) {
+                      return
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
+                    } else if (event.key === 'Enter' && filteredSlashCommands.length > 0) {
+                      event.preventDefault()
+                      insertSlashCommand(filteredSlashCommands[0])
+                    }
+                  }}
                   spellCheck={false}
                 />
               )}
               {(editorMode === 'preview' || editorMode === 'split') && (
                 <article className="preview-pane">{renderMarkdown(activeNote.content)}</article>
+              )}
+              {slashState.isOpen && editorMode !== 'preview' && (
+                <section className="slash-panel">
+                  <header>
+                    <strong>Slash Commands</strong>
+                    <small>Press Enter to apply first match</small>
+                  </header>
+                  <div className="slash-list">
+                    {filteredSlashCommands.map((command) => (
+                      <button
+                        key={command.id}
+                        type="button"
+                        className="slash-item"
+                        onClick={() => insertSlashCommand(command)}
+                      >
+                        <span>{command.name}</span>
+                        <small>{command.description}</small>
+                      </button>
+                    ))}
+                    {filteredSlashCommands.length === 0 && (
+                      <p className="muted">No slash command matches.</p>
+                    )}
+                  </div>
+                </section>
               )}
             </div>
           ) : (
@@ -916,6 +1571,42 @@ function App() {
                   <p>
                     <strong>Words:</strong> {activeNote.content.split(/\s+/).filter(Boolean).length}
                   </p>
+                  <p>
+                    <strong>Frontmatter:</strong> {activeFrontmatter.length}
+                  </p>
+                  <p>
+                    <strong>Inline Metadata:</strong> {activeInlineMetadata.length}
+                  </p>
+                </section>
+
+                <section className="inspector-card">
+                  <h3>Metadata</h3>
+                  <p>
+                    <strong>Frontmatter Fields</strong>
+                  </p>
+                  <ul>
+                    {activeFrontmatter.length === 0 && <li className="muted">No frontmatter fields</li>}
+                    {activeFrontmatter.map((field) => (
+                      <li key={`fm-${field.key}-${field.value}`}>
+                        <code>
+                          {field.key}: {field.value}
+                        </code>
+                      </li>
+                    ))}
+                  </ul>
+                  <p>
+                    <strong>Inline Fields</strong>
+                  </p>
+                  <ul>
+                    {activeInlineMetadata.length === 0 && <li className="muted">No inline fields</li>}
+                    {activeInlineMetadata.map((field) => (
+                      <li key={`im-${field.key}-${field.value}`}>
+                        <code>
+                          {field.key}:: {field.value}
+                        </code>
+                      </li>
+                    ))}
+                  </ul>
                 </section>
 
                 <section className="inspector-card">
@@ -937,6 +1628,46 @@ function App() {
                         <button type="button" className="inline-link" onClick={() => openNote(note.id, note.title)}>
                           {note.title}
                         </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+
+                <section className="inspector-card">
+                  <h3>Blocks and Embeds</h3>
+                  <p>
+                    <strong>Anchors</strong>
+                  </p>
+                  <ul>
+                    {activeBlockAnchors.length === 0 && <li className="muted">No anchors</li>}
+                    {activeBlockAnchors.map((anchor) => (
+                      <li key={anchor}>
+                        <code>^{anchor}</code>
+                      </li>
+                    ))}
+                  </ul>
+                  <p>
+                    <strong>Block References</strong>
+                  </p>
+                  <ul>
+                    {activeBlockReferences.length === 0 && <li className="muted">No block references</li>}
+                    {activeBlockReferences.map((reference) => (
+                      <li key={`block-ref-${reference.raw}`}>
+                        <code>
+                          {reference.target}
+                          #^{reference.blockId}
+                        </code>
+                      </li>
+                    ))}
+                  </ul>
+                  <p>
+                    <strong>Embeds</strong>
+                  </p>
+                  <ul>
+                    {activeEmbeds.length === 0 && <li className="muted">No embeds</li>}
+                    {activeEmbeds.map((reference) => (
+                      <li key={`embed-${reference.raw}`}>
+                        <code>{reference.raw}</code>
                       </li>
                     ))}
                   </ul>
@@ -979,7 +1710,7 @@ function App() {
                 <section className="inspector-card">
                   <h3>Keybindings</h3>
                   <div className="binding-grid">
-                    {commands.slice(0, 6).map((command) => (
+                    {commands.slice(0, 12).map((command) => (
                       <label key={command.id} className="binding-row">
                         <span>{command.name}</span>
                         <input
@@ -992,6 +1723,52 @@ function App() {
                       </label>
                     ))}
                   </div>
+                </section>
+
+                <section className="inspector-card">
+                  <h3>Capture Settings</h3>
+                  <label className="binding-row">
+                    <span>Daily Folder</span>
+                    <input
+                      type="text"
+                      value={dailyNoteConfig.folder}
+                      onChange={(event) =>
+                        setDailyNoteConfig((current) => ({
+                          ...current,
+                          folder: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="binding-row">
+                    <span>Daily File Pattern</span>
+                    <input
+                      type="text"
+                      value={dailyNoteConfig.fileNamePattern}
+                      onChange={(event) =>
+                        setDailyNoteConfig((current) => ({
+                          ...current,
+                          fileNamePattern: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="binding-row">
+                    <span>Daily Heading Template</span>
+                    <input
+                      type="text"
+                      value={dailyNoteConfig.headingTemplate}
+                      onChange={(event) =>
+                        setDailyNoteConfig((current) => ({
+                          ...current,
+                          headingTemplate: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <button type="button" onClick={() => openTodayDailyNote()}>
+                    Open Daily Note
+                  </button>
                 </section>
               </>
             ) : (
@@ -1076,6 +1853,55 @@ function App() {
                   <small>{note.updatedAt}</small>
                 </button>
               ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {captureOpen && (
+        <div className="overlay" onClick={() => setCaptureOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Quick Capture</h2>
+              <button type="button" onClick={() => setCaptureOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-modal-body">
+              <label className="binding-row">
+                <span>Target</span>
+                <select
+                  value={captureTarget}
+                  onChange={(event) => setCaptureTarget(event.target.value as CaptureTarget)}
+                >
+                  <option value="inbox">Inbox</option>
+                  <option value="daily">Daily Note</option>
+                  <option value="active">Active Note</option>
+                </select>
+              </label>
+              <label className="binding-row">
+                <span>Capture</span>
+                <textarea
+                  className="capture-input"
+                  value={captureText}
+                  onChange={(event) => setCaptureText(event.target.value)}
+                  placeholder="Capture thought, intent, blocker, or decision..."
+                  autoFocus
+                />
+              </label>
+              <div className="capture-actions">
+                <button type="button" onClick={() => appendCaptureEntry(captureTarget, captureText)}>
+                  Append
+                </button>
+                <button type="button" onClick={() => setCaptureOpen(false)}>
+                  Cancel
+                </button>
+              </div>
             </div>
           </section>
         </div>

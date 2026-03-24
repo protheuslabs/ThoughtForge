@@ -1,10 +1,10 @@
 # SRS Full Implementation Verification
 
-Generated at `2026-03-24T05:59:02Z`.
+Generated at `2026-03-24T21:22:36Z`.
 
 ## Summary
 
-- Requirements not marked done: 132
+- Requirements not marked done: 127
 - Stub markers found: 0
 
 Result: FAIL
@@ -14,17 +14,12 @@ Result: FAIL
 | `FR-WV-006` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support multiple root folders or mounted collections inside one workspace. |
 | `FR-WV-007` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support encrypted app secrets and provider credentials. |
 | `FR-WV-008` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support deep-link protocol actions using `thoughtforge://` URIs for opening vaults, notes, and agent-safe actions. |
-| `FR-CI-002` | `Must` | M1 - Vault and Capture Foundation | `in_progress` | The system shall support append flows to inbox notes, daily notes, and selected notes. |
 | `FR-CI-003` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support drag-and-drop or picker-based attachment import. |
 | `FR-CI-004` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support clipboard web clipping with source URL and capture timestamp. |
 | `FR-CI-005` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support voice memo or speech-to-note capture through pluggable transcription providers. |
 | `FR-CI-006` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support ingestion pipelines for PDFs, web pages, code files, transcripts, and meeting recordings. |
-| `FR-CI-007` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support configurable daily-note capture and append flows. |
 | `FR-ED-001` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall provide a rich Markdown-native editor. |
-| `FR-ED-003` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support tags, frontmatter, and inline metadata fields. |
-| `FR-ED-004` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support block references and embeds. |
 | `FR-ED-005` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support undo, redo, autosave, and crash-safe recovery. |
-| `FR-ED-006` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support slash commands and command palette insertion flows. |
 | `FR-ED-008` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support custom typed blocks such as callouts, evidence excerpts, tasks, decisions, commitments, and constraints. |
 | `FR-ED-009` | `Could` | M1 - Vault and Capture Foundation | `todo` | The system could support WYSIWYG and source modes with shared document state. |
 | `FR-ED-010` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support visual workspace documents stored in an open, serializable format. |

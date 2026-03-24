@@ -120,12 +120,45 @@ pub struct WorkspaceEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetadataField {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockAnchor {
+    pub id: String,
+    pub line: u32,
+    pub preview: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoteReference {
+    pub raw: String,
+    pub target: String,
+    pub block_id: Option<String>,
+    pub embedded: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolvedBlockReference {
+    pub note_id: String,
+    pub note_path: String,
+    pub note_title: String,
+    pub block: BlockAnchor,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IndexedNote {
     pub id: String,
     pub path: String,
     pub title: String,
     pub tags: Vec<String>,
     pub links: Vec<String>,
+    pub frontmatter: Vec<MetadataField>,
+    pub inline_metadata: Vec<MetadataField>,
+    pub block_anchors: Vec<BlockAnchor>,
+    pub references: Vec<NoteReference>,
     pub updated_at: Option<u64>,
 }
 
@@ -203,6 +236,39 @@ pub struct VaultFileChange {
     pub path: String,
     pub previous_path: Option<String>,
     pub reason: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CaptureTarget {
+    Inbox,
+    Daily,
+    SelectedNote,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DailyNoteConfig {
+    pub folder: String,
+    pub file_name_pattern: String,
+    pub heading_template: String,
+}
+
+impl Default for DailyNoteConfig {
+    fn default() -> Self {
+        Self {
+            folder: "00 Daily".to_string(),
+            file_name_pattern: "%Y-%m-%d".to_string(),
+            heading_template: "# Daily Note - {date}".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CaptureAppendResult {
+    pub target: CaptureTarget,
+    pub note_path: String,
+    pub created_note: bool,
+    pub appended_text: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

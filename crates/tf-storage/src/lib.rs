@@ -5,11 +5,13 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chrono::{DateTime, Utc};
 use serde::{Serialize, de::DeserializeOwned};
 use tf_domain::{
-    IndexedNote, NoteIdentityRecord, RequirementExecution, Status, VaultFileChange,
-    VaultFileChangeKind, VaultFileSnapshot, VaultIndex, VaultNoteIdentityState, VaultRegistration,
-    VaultScanSnapshot, WorkspaceRegistry,
+    BlockAnchor, CaptureAppendResult, CaptureTarget, DailyNoteConfig, IndexedNote, MetadataField,
+    NoteIdentityRecord, NoteReference, RequirementExecution, ResolvedBlockReference, Status,
+    VaultFileChange, VaultFileChangeKind, VaultFileSnapshot, VaultIndex, VaultNoteIdentityState,
+    VaultRegistration, VaultScanSnapshot, WorkspaceRegistry,
 };
 
 const META_DIR_NAME: &str = ".thoughtforge";
@@ -195,6 +197,124 @@ pub fn append_to_note(vault_root: &Path, note_path: &str, appended_text: &str) -
     Ok(())
 }
 
+pub fn resolve_daily_note_path(
+    config: &DailyNoteConfig,
+    at: Option<SystemTime>,
+) -> io::Result<String> {
+    let instant = at.unwrap_or_else(SystemTime::now);
+    let date_time: DateTime<Utc> = DateTime::<Utc>::from(instant);
+    let date = date_time.format(&config.file_name_pattern).to_string();
+    if date.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "daily note file_name_pattern resolved to empty name",
+        ));
+    }
+    let folder = if config.folder.trim().is_empty() {
+        "00 Daily"
+    } else {
+        config.folder.trim()
+    };
+    Ok(format!("{folder}/{date}.md"))
+}
+
+pub fn ensure_daily_note(
+    vault_root: &Path,
+    config: &DailyNoteConfig,
+    at: Option<SystemTime>,
+) -> io::Result<(String, bool)> {
+    let note_path = resolve_daily_note_path(config, at)?;
+    let full_path = vault_root.join(&note_path);
+    if full_path.exists() {
+        return Ok((note_path, false));
+    }
+
+    if let Some(parent) = full_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let date_token = Path::new(&note_path)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("daily");
+    let heading = config.heading_template.replace("{date}", date_token);
+    fs::write(full_path, format!("{heading}\n\n"))?;
+    Ok((note_path, true))
+}
+
+pub fn append_capture(
+    vault_root: &Path,
+    target: CaptureTarget,
+    text: &str,
+    selected_note_path: Option<&str>,
+    daily_config: Option<&DailyNoteConfig>,
+) -> io::Result<CaptureAppendResult> {
+    let normalized_text = text.trim();
+    if normalized_text.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "capture text cannot be empty",
+        ));
+    }
+
+    let (note_path, created_note) = match target {
+        CaptureTarget::Inbox => {
+            let full_path = vault_root.join(DEFAULT_INBOX_FILE);
+            if !full_path.exists() {
+                if let Some(parent) = full_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::write(&full_path, "# Inbox\n\n")?;
+                (DEFAULT_INBOX_FILE.to_string(), true)
+            } else {
+                (DEFAULT_INBOX_FILE.to_string(), false)
+            }
+        }
+        CaptureTarget::Daily => {
+            let fallback_config;
+            let config = if let Some(config) = daily_config {
+                config
+            } else {
+                fallback_config = DailyNoteConfig::default();
+                &fallback_config
+            };
+            ensure_daily_note(vault_root, config, None)?
+        }
+        CaptureTarget::SelectedNote => {
+            let selected = selected_note_path
+                .map(str::trim)
+                .filter(|path| !path.is_empty())
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "selected note target requires selected_note_path",
+                    )
+                })?;
+            let full_path = vault_root.join(selected);
+            if !full_path.exists() {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("selected note does not exist: {selected}"),
+                ));
+            }
+            (selected.to_string(), false)
+        }
+    };
+
+    let timestamp = DateTime::<Utc>::from(SystemTime::now())
+        .format("%Y-%m-%d %H:%M")
+        .to_string();
+    let line = format!("- [{timestamp}] {normalized_text}");
+    append_to_note(vault_root, &note_path, &line)?;
+
+    Ok(CaptureAppendResult {
+        target,
+        note_path,
+        created_note,
+        appended_text: line,
+    })
+}
+
 pub fn index_vault_markdown(root: &Path) -> io::Result<VaultIndex> {
     create_vault(root)?;
 
@@ -240,12 +360,25 @@ pub fn index_vault_markdown(root: &Path) -> io::Result<VaultIndex> {
             fingerprint: fingerprint.clone(),
         });
 
+        let frontmatter = extract_frontmatter_fields(&content);
+        let inline_metadata = extract_inline_metadata_fields(&content);
+        let references = extract_references(&content);
+        let links = references
+            .iter()
+            .map(|reference| reference.target.clone())
+            .filter(|target| !target.is_empty())
+            .collect::<Vec<_>>();
+
         notes.push(IndexedNote {
             id: note_id,
             path: relative_path.clone(),
             title: extract_title(&content, &relative_path),
             tags: extract_tags(&content),
-            links: extract_links(&content),
+            links,
+            frontmatter,
+            inline_metadata,
+            block_anchors: extract_block_anchors(&content),
+            references,
             updated_at,
         });
     }
@@ -280,6 +413,37 @@ pub fn backlinks_for_note(index: &VaultIndex, note_ref: &str) -> Vec<String> {
         .find(|(id, _)| id == target_id)
         .map(|(_, sources)| sources.clone())
         .unwrap_or_default()
+}
+
+pub fn resolve_block_reference(
+    index: &VaultIndex,
+    reference: &str,
+) -> Option<ResolvedBlockReference> {
+    let (target, block_id) = parse_reference_parts(reference);
+    let block_id = block_id?;
+
+    let mut alias_to_id = HashMap::new();
+    for note in &index.notes {
+        for alias in note_aliases(note) {
+            alias_to_id.insert(alias, note.id.clone());
+        }
+    }
+
+    let target_id = alias_to_id.get(&target)?;
+    let note = index
+        .notes
+        .iter()
+        .find(|candidate| &candidate.id == target_id)?;
+    let block = note.block_anchors.iter().find(|anchor| {
+        anchor.id.eq_ignore_ascii_case(&block_id) || normalize_link(&anchor.id) == block_id
+    })?;
+
+    Some(ResolvedBlockReference {
+        note_id: note.id.clone(),
+        note_path: note.path.clone(),
+        note_title: note.title.clone(),
+        block: block.clone(),
+    })
 }
 
 pub fn snapshot_vault_files(root: &Path) -> io::Result<VaultScanSnapshot> {
@@ -529,57 +693,243 @@ fn extract_tags(content: &str) -> Vec<String> {
     tags.into_iter().collect()
 }
 
-fn extract_links(content: &str) -> Vec<String> {
-    let mut links = BTreeSet::new();
-    links.extend(extract_wikilinks(content));
-    links.extend(extract_markdown_links(content));
-    links.into_iter().collect()
+fn extract_frontmatter_fields(content: &str) -> Vec<MetadataField> {
+    let mut lines = content.lines();
+    let Some(first_line) = lines.next() else {
+        return Vec::new();
+    };
+    if first_line.trim() != "---" {
+        return Vec::new();
+    }
+
+    let mut fields = Vec::new();
+    let mut closed = false;
+    for line in lines {
+        if line.trim() == "---" {
+            closed = true;
+            break;
+        }
+        if let Some((key, value)) = line.split_once(':') {
+            let key = key.trim();
+            let value = value.trim();
+            if !key.is_empty() && !value.is_empty() {
+                fields.push(MetadataField {
+                    key: key.to_string(),
+                    value: value.to_string(),
+                });
+            }
+        }
+    }
+
+    if closed { fields } else { Vec::new() }
 }
 
-fn extract_wikilinks(content: &str) -> Vec<String> {
-    let mut links = Vec::new();
+fn extract_inline_metadata_fields(content: &str) -> Vec<MetadataField> {
+    let mut fields = Vec::new();
+    let mut in_frontmatter = false;
+    let mut frontmatter_checked = false;
+    let mut in_code_block = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if !frontmatter_checked {
+            frontmatter_checked = true;
+            if trimmed == "---" {
+                in_frontmatter = true;
+                continue;
+            }
+        }
+        if in_frontmatter {
+            if trimmed == "---" {
+                in_frontmatter = false;
+            }
+            continue;
+        }
+
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once("::") else {
+            continue;
+        };
+        let key = key.trim();
+        let value = value.trim();
+        if key.is_empty() || value.is_empty() || !is_metadata_key(key) {
+            continue;
+        }
+        fields.push(MetadataField {
+            key: key.to_string(),
+            value: value.to_string(),
+        });
+    }
+
+    fields
+}
+
+fn extract_block_anchors(content: &str) -> Vec<BlockAnchor> {
+    let mut anchors = Vec::new();
+    let mut in_code_block = false;
+
+    for (line_idx, line) in content.lines().enumerate() {
+        let trimmed = line.trim_end();
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block || trimmed.is_empty() {
+            continue;
+        }
+
+        let Some(caret_idx) = trimmed.rfind('^') else {
+            continue;
+        };
+        let candidate = trimmed[(caret_idx + 1)..].trim();
+        if candidate.is_empty()
+            || !candidate
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+        {
+            continue;
+        }
+        let prefix_char = trimmed[..caret_idx].chars().last();
+        let valid_prefix = prefix_char
+            .map(|ch| ch.is_whitespace() || ch == ']' || ch == ')' || ch == ':' || ch == '.')
+            .unwrap_or(true);
+        if !valid_prefix {
+            continue;
+        }
+
+        anchors.push(BlockAnchor {
+            id: candidate.to_string(),
+            line: (line_idx + 1) as u32,
+            preview: trimmed[..caret_idx].trim().to_string(),
+        });
+    }
+
+    anchors
+}
+
+fn extract_references(content: &str) -> Vec<NoteReference> {
+    let mut references = Vec::new();
+    references.extend(extract_wikilink_references(content));
+    references.extend(extract_markdown_references(content));
+
+    let mut dedup = BTreeSet::new();
+    references.retain(|reference| {
+        dedup.insert(format!(
+            "{}|{}|{}|{}",
+            reference.target,
+            reference.block_id.clone().unwrap_or_default(),
+            reference.embedded,
+            reference.raw
+        ))
+    });
+    references
+}
+
+fn extract_wikilink_references(content: &str) -> Vec<NoteReference> {
+    let mut refs = Vec::new();
     let mut cursor = 0usize;
     while let Some(start) = content[cursor..].find("[[") {
-        let start_idx = cursor + start + 2;
+        let marker_idx = cursor + start;
+        let start_idx = marker_idx + 2;
         let Some(end_rel) = content[start_idx..].find("]]") else {
             break;
         };
-        let raw = &content[start_idx..start_idx + end_rel];
-        let link = normalize_link(raw);
-        if !link.is_empty() {
-            links.push(link);
+        let end_idx = start_idx + end_rel;
+        let raw = content[start_idx..end_idx].trim();
+        let embedded = marker_idx > 0 && content.as_bytes()[marker_idx - 1] == b'!';
+        let (target, block_id) = parse_reference_parts(raw);
+        if !target.is_empty() {
+            refs.push(NoteReference {
+                raw: raw.to_string(),
+                target,
+                block_id,
+                embedded,
+            });
         }
-        cursor = start_idx + end_rel + 2;
+        cursor = end_idx + 2;
     }
-    links
+    refs
 }
 
-fn extract_markdown_links(content: &str) -> Vec<String> {
-    let mut links = Vec::new();
+fn extract_markdown_references(content: &str) -> Vec<NoteReference> {
+    let mut refs = Vec::new();
     let mut cursor = 0usize;
-    while let Some(open) = content[cursor..].find("](") {
-        let target_start = cursor + open + 2;
+    while let Some(open_rel) = content[cursor..].find("](") {
+        let marker_idx = cursor + open_rel;
+        let target_start = marker_idx + 2;
         let Some(close_rel) = content[target_start..].find(')') else {
             break;
         };
-        let raw = &content[target_start..target_start + close_rel];
-        let raw = raw.trim();
-        if raw.starts_with("http://")
-            || raw.starts_with("https://")
-            || raw.starts_with("mailto:")
-            || raw.starts_with("obsidian://")
-            || raw.starts_with("thoughtforge://")
-        {
-            cursor = target_start + close_rel + 1;
+        let target_end = target_start + close_rel;
+        let raw = content[target_start..target_end].trim();
+        cursor = target_end + 1;
+
+        if raw.is_empty() || is_external_link(raw) {
             continue;
         }
-        let link = normalize_link(raw);
-        if !link.is_empty() {
-            links.push(link);
+
+        let bracket_open = content[..marker_idx].rfind('[');
+        let embedded = bracket_open
+            .and_then(|idx| idx.checked_sub(1))
+            .map(|idx| content.as_bytes()[idx] == b'!')
+            .unwrap_or(false);
+        let (target, block_id) = parse_reference_parts(raw);
+        if target.is_empty() {
+            continue;
         }
-        cursor = target_start + close_rel + 1;
+        refs.push(NoteReference {
+            raw: raw.to_string(),
+            target,
+            block_id,
+            embedded,
+        });
     }
-    links
+    refs
+}
+
+fn is_external_link(raw: &str) -> bool {
+    let lower = raw.trim().to_ascii_lowercase();
+    lower.starts_with("http://")
+        || lower.starts_with("https://")
+        || lower.starts_with("mailto:")
+        || lower.starts_with("obsidian://")
+        || lower.starts_with("thoughtforge://")
+}
+
+fn is_metadata_key(key: &str) -> bool {
+    key.chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.')
+}
+
+fn parse_reference_parts(raw: &str) -> (String, Option<String>) {
+    let before_alias = raw.split('|').next().unwrap_or(raw).trim();
+    if before_alias.is_empty() {
+        return (String::new(), None);
+    }
+
+    let (target_candidate, block_id) = if let Some((target, anchor)) = before_alias.split_once("#^")
+    {
+        let block = anchor.trim();
+        let block = if block.is_empty() {
+            None
+        } else {
+            Some(block.to_ascii_lowercase())
+        };
+        (target.trim(), block)
+    } else if let Some((target, _)) = before_alias.split_once('#') {
+        (target.trim(), None)
+    } else {
+        (before_alias, None)
+    };
+
+    (normalize_link(target_candidate), block_id)
 }
 
 fn normalize_link(raw: &str) -> String {
@@ -588,6 +938,7 @@ fn normalize_link(raw: &str) -> String {
     without_anchor
         .trim()
         .trim_start_matches("./")
+        .trim_start_matches('/')
         .trim_end_matches(".md")
         .to_ascii_lowercase()
 }
@@ -728,7 +1079,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
     use std::time::{SystemTime, UNIX_EPOCH};
-    use tf_domain::{Priority, Requirement};
+    use tf_domain::{CaptureTarget, DailyNoteConfig, Priority, Requirement};
 
     fn test_dir(prefix: &str) -> PathBuf {
         let suffix = SystemTime::now()
@@ -869,5 +1220,112 @@ mod tests {
                 .any(|change| change.kind == VaultFileChangeKind::Renamed),
             "should detect rename"
         );
+    }
+
+    #[test]
+    fn appends_capture_routes_to_inbox_daily_and_selected_note() {
+        let vault = test_dir("thoughtforge-capture");
+        create_vault(&vault).expect("create vault");
+        fs::write(vault.join("selected.md"), "# Selected\n\n").expect("write selected note");
+
+        let inbox = append_capture(&vault, CaptureTarget::Inbox, "inbox capture", None, None)
+            .expect("append to inbox");
+        assert_eq!(inbox.note_path, "00 Inbox/Inbox.md");
+
+        let config = DailyNoteConfig {
+            folder: "01 Daily".to_string(),
+            file_name_pattern: "%Y-%m-%d".to_string(),
+            heading_template: "# Daily {date}".to_string(),
+        };
+        let daily = append_capture(
+            &vault,
+            CaptureTarget::Daily,
+            "daily capture",
+            None,
+            Some(&config),
+        )
+        .expect("append to daily");
+        assert!(daily.note_path.starts_with("01 Daily/"));
+
+        let selected = append_capture(
+            &vault,
+            CaptureTarget::SelectedNote,
+            "selected capture",
+            Some("selected.md"),
+            None,
+        )
+        .expect("append to selected note");
+        assert_eq!(selected.note_path, "selected.md");
+
+        let selected_contents =
+            fs::read_to_string(vault.join("selected.md")).expect("read selected note");
+        assert!(selected_contents.contains("selected capture"));
+    }
+
+    #[test]
+    fn indexes_frontmatter_inline_metadata_and_block_references() {
+        let vault = test_dir("thoughtforge-vault-metadata");
+        fs::create_dir_all(&vault).expect("create vault");
+        fs::write(
+            vault.join("reference.md"),
+            "# Reference\n\nAnchor line ^anchor-ref\n",
+        )
+        .expect("write reference");
+        fs::write(
+            vault.join("note.md"),
+            r#"---
+owner: ops
+priority: high
+---
+# Note
+status:: active
+depends_on:: [[reference#^anchor-ref]]
+![[reference#^anchor-ref]]
+"#,
+        )
+        .expect("write note");
+
+        let index = index_vault_markdown(&vault).expect("index vault");
+        let note = index
+            .notes
+            .iter()
+            .find(|candidate| candidate.path == "note.md")
+            .expect("note entry");
+
+        assert!(
+            note.frontmatter
+                .iter()
+                .any(|field| field.key == "owner" && field.value == "ops")
+        );
+        assert!(
+            note.inline_metadata
+                .iter()
+                .any(|field| field.key == "status" && field.value == "active")
+        );
+        assert!(note.references.iter().any(|reference| {
+            reference.target == "reference" && reference.block_id.as_deref() == Some("anchor-ref")
+        }));
+        assert!(
+            note.references
+                .iter()
+                .any(|reference| reference.target == "reference" && reference.embedded)
+        );
+    }
+
+    #[test]
+    fn resolves_block_reference_from_index() {
+        let vault = test_dir("thoughtforge-vault-block-ref");
+        fs::create_dir_all(&vault).expect("create vault");
+        fs::write(
+            vault.join("alpha.md"),
+            "# Alpha\n\nDecision rationale ^decision-r1\n",
+        )
+        .expect("write alpha");
+        let index = index_vault_markdown(&vault).expect("index vault");
+
+        let resolved =
+            resolve_block_reference(&index, "alpha#^decision-r1").expect("resolve block reference");
+        assert_eq!(resolved.note_path, "alpha.md");
+        assert_eq!(resolved.block.id, "decision-r1");
     }
 }

@@ -151,8 +151,13 @@ npm run cli -- vault-list
 npm run cli -- vault-switch --vault-id <vault_id>
 npm run cli -- index-vault --path /path/to/vault
 npm run cli -- backlinks --path /path/to/vault --note "Project Dossier"
+npm run cli -- resolve-block --path /path/to/vault --ref "Project Dossier#^decision-r1"
 npm run cli -- note-create --path /path/to/vault --title "Captured Idea"
 npm run cli -- note-append --path /path/to/vault --note "00 Inbox/Inbox.md" --text "- [ ] Follow up"
+npm run cli -- capture-append --path /path/to/vault --target inbox --text "Captured thought"
+npm run cli -- capture-append --path /path/to/vault --target daily --text "Daily capture"
+npm run cli -- capture-append --path /path/to/vault --target note --note "01 Projects/Alpha.md" --text "Append to selected note"
+npm run cli -- daily-note-open --path /path/to/vault --daily-folder "00 Daily" --daily-pattern "%Y-%m-%d"
 npm run cli -- snapshot-vault --path /path/to/vault
 npm run cli -- detect-edits --path /path/to/vault --previous /tmp/vault-snapshot.json
 cargo test --workspace

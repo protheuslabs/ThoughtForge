@@ -9,11 +9,13 @@ use tf_agent_runtime::{
 use tf_context_compiler::{compile_handoff_bundle, compile_resume_bundle, compile_task_bundle};
 use tf_context_daemon::{capture_vault_snapshot, detect_decay, detect_external_edits};
 use tf_domain::{
-    DiagnosticEvent, DiagnosticLevel, ProjectDossier, WorkspaceSnapshot, append_diagnostic_jsonl,
+    CaptureTarget, DailyNoteConfig, DiagnosticEvent, DiagnosticLevel, ProjectDossier,
+    WorkspaceSnapshot, append_diagnostic_jsonl,
 };
 use tf_storage::{
-    append_to_note, backlinks_for_note, create_markdown_note, create_vault, index_vault_markdown,
-    load_workspace_registry, register_or_open_vault, switch_active_vault,
+    append_capture, append_to_note, backlinks_for_note, create_markdown_note, create_vault,
+    ensure_daily_note, index_vault_markdown, load_workspace_registry, register_or_open_vault,
+    resolve_block_reference, switch_active_vault,
 };
 
 const DIAGNOSTIC_LOG_PATH: &str = "logs/diagnostics.jsonl";
@@ -163,6 +165,37 @@ fn run() -> Result<(), String> {
                 "appended": true
             }))?;
         }
+        "capture-append" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let target_raw = flag_value(&tail, "--target")?;
+            let target = parse_capture_target(&target_raw)?;
+            let text = flag_value(&tail, "--text")?;
+            let selected_note = optional_flag_value(&tail, "--note");
+            let daily_config = daily_config_from_flags(&tail);
+            let result = append_capture(
+                Path::new(&vault_path),
+                target,
+                &text,
+                selected_note.as_deref(),
+                Some(&daily_config),
+            )
+            .map_err(|error| format!("failed to append capture in {vault_path}: {error}"))?;
+            print_json(&result)?;
+        }
+        "daily-note-open" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let daily_config = daily_config_from_flags(&tail);
+            let (note_path, created) =
+                ensure_daily_note(Path::new(&vault_path), &daily_config, None).map_err(
+                    |error| format!("failed to open daily note in {vault_path}: {error}"),
+                )?;
+            print_json(&json!({
+                "vault": vault_path,
+                "note_path": note_path,
+                "created": created,
+                "config": daily_config
+            }))?;
+        }
         "index-vault" => {
             let vault_path = flag_value(&tail, "--path")?;
             let index = index_vault_markdown(Path::new(&vault_path))
@@ -178,6 +211,17 @@ fn run() -> Result<(), String> {
             print_json(&json!({
                 "note": note_ref,
                 "backlinks": backlinks
+            }))?;
+        }
+        "resolve-block" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let reference = flag_value(&tail, "--ref")?;
+            let index = index_vault_markdown(Path::new(&vault_path))
+                .map_err(|error| format!("failed to index vault {vault_path}: {error}"))?;
+            let resolved = resolve_block_reference(&index, &reference);
+            print_json(&json!({
+                "reference": reference,
+                "resolved": resolved
             }))?;
         }
         "snapshot-vault" => {
@@ -239,7 +283,7 @@ fn run() -> Result<(), String> {
 
 fn usage(message: String) -> String {
     format!(
-        "{message}\nUsage:\n  tf-cli compile-task --dossier <path> --objective <text>\n  tf-cli compile-resume --dossier <path>\n  tf-cli compile-handoff --dossier <path> --recipient <id>\n  tf-cli detect-decay --snapshot <path>\n  tf-cli plan-resume --dossier <path>\n  tf-cli plan-handoff --dossier <path> --recipient <id>\n  tf-cli list-commands\n  tf-cli list-core-plugins\n  tf-cli vault-create --path <vault_dir> [--name <name>] [--registry <path>]\n  tf-cli vault-open --path <vault_dir> [--name <name>] [--registry <path>]\n  tf-cli vault-switch --vault-id <id> [--registry <path>]\n  tf-cli vault-list [--registry <path>]\n  tf-cli note-create --path <vault_dir> --title <title> [--folder <folder>] [--body <text>]\n  tf-cli note-append --path <vault_dir> --note <relative_path> --text <text>\n  tf-cli index-vault --path <vault_dir>\n  tf-cli backlinks --path <vault_dir> --note <title_or_path>\n  tf-cli snapshot-vault --path <vault_dir>\n  tf-cli detect-edits --path <vault_dir> --previous <snapshot_json>\n  tf-cli srs-status --matrix <path>"
+        "{message}\nUsage:\n  tf-cli compile-task --dossier <path> --objective <text>\n  tf-cli compile-resume --dossier <path>\n  tf-cli compile-handoff --dossier <path> --recipient <id>\n  tf-cli detect-decay --snapshot <path>\n  tf-cli plan-resume --dossier <path>\n  tf-cli plan-handoff --dossier <path> --recipient <id>\n  tf-cli list-commands\n  tf-cli list-core-plugins\n  tf-cli vault-create --path <vault_dir> [--name <name>] [--registry <path>]\n  tf-cli vault-open --path <vault_dir> [--name <name>] [--registry <path>]\n  tf-cli vault-switch --vault-id <id> [--registry <path>]\n  tf-cli vault-list [--registry <path>]\n  tf-cli note-create --path <vault_dir> --title <title> [--folder <folder>] [--body <text>]\n  tf-cli note-append --path <vault_dir> --note <relative_path> --text <text>\n  tf-cli capture-append --path <vault_dir> --target <inbox|daily|note> --text <text> [--note <relative_path>] [--daily-folder <folder>] [--daily-pattern <strftime>] [--daily-heading <template>]\n  tf-cli daily-note-open --path <vault_dir> [--daily-folder <folder>] [--daily-pattern <strftime>] [--daily-heading <template>]\n  tf-cli index-vault --path <vault_dir>\n  tf-cli backlinks --path <vault_dir> --note <title_or_path>\n  tf-cli resolve-block --path <vault_dir> --ref <note#^block>\n  tf-cli snapshot-vault --path <vault_dir>\n  tf-cli detect-edits --path <vault_dir> --previous <snapshot_json>\n  tf-cli srs-status --matrix <path>"
     )
 }
 
@@ -256,6 +300,28 @@ fn flag_value(args: &[String], name: &str) -> Result<String, String> {
 fn optional_flag_value(args: &[String], name: &str) -> Option<String> {
     let idx = args.iter().position(|entry| entry == name)?;
     args.get(idx + 1).cloned()
+}
+
+fn parse_capture_target(value: &str) -> Result<CaptureTarget, String> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "inbox" => Ok(CaptureTarget::Inbox),
+        "daily" => Ok(CaptureTarget::Daily),
+        "note" | "selected" | "selected_note" => Ok(CaptureTarget::SelectedNote),
+        other => Err(format!(
+            "unsupported capture target '{other}'. expected one of: inbox, daily, note"
+        )),
+    }
+}
+
+fn daily_config_from_flags(args: &[String]) -> DailyNoteConfig {
+    DailyNoteConfig {
+        folder: optional_flag_value(args, "--daily-folder")
+            .unwrap_or_else(|| "00 Daily".to_string()),
+        file_name_pattern: optional_flag_value(args, "--daily-pattern")
+            .unwrap_or_else(|| "%Y-%m-%d".to_string()),
+        heading_template: optional_flag_value(args, "--daily-heading")
+            .unwrap_or_else(|| "# Daily Note - {date}".to_string()),
+    }
 }
 
 fn read_json_file<T>(path: &str) -> Result<T, String>
