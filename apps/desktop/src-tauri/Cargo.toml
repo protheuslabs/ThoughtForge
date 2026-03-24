@@ -1,0 +1,11 @@
+[package]
+name = "thoughtforge-desktop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tf-agent-runtime = { path = "../../../crates/tf-agent-runtime" }
+tf-context-compiler = { path = "../../../crates/tf-context-compiler" }
+tf-context-daemon = { path = "../../../crates/tf-context-daemon" }
+tf-domain = { path = "../../../crates/tf-domain" }
+tf-storage = { path = "../../../crates/tf-storage" }

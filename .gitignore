@@ -1,0 +1,8 @@
+node_modules/
+dist/
+target/
+logs/
+**/.DS_Store
+apps/desktop/node_modules/
+apps/desktop/dist/
+apps/desktop/.vite/

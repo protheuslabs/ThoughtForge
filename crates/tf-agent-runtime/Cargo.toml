@@ -1,0 +1,8 @@
+[package]
+name = "tf-agent-runtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tf-context-compiler = { path = "../tf-context-compiler" }
+tf-domain = { path = "../tf-domain" }

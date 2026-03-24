@@ -1,0 +1,141 @@
+.shell {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(255, 172, 117, 0.35), transparent 40%),
+    radial-gradient(circle at 10% 90%, rgba(51, 112, 255, 0.18), transparent 48%),
+    var(--surface);
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.subtitle {
+  margin: 0;
+  max-width: 48rem;
+  color: var(--muted);
+}
+
+.panel {
+  border: 1px solid var(--edge);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: 1.1rem 1rem;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.95rem;
+}
+
+.chip {
+  border-radius: 999px;
+  font-size: 0.76rem;
+  border: 1px solid var(--edge);
+  padding: 0.2rem 0.55rem;
+  background: var(--chip);
+  color: var(--text-strong);
+  font-family: var(--mono);
+}
+
+.chip.muted {
+  color: var(--muted);
+}
+
+.milestones {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.milestone {
+  border: 1px solid var(--edge);
+  border-radius: 0.75rem;
+  padding: 0.8rem;
+  background: var(--surface-low);
+}
+
+.milestone h3 {
+  margin: 0.45rem 0;
+  font-size: 1rem;
+}
+
+.milestone p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.row span[data-status] {
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--mono);
+}
+
+.row span[data-status='in progress'] {
+  color: #8c4b00;
+  background: #ffe9d4;
+}
+
+.row span[data-status='queued'] {
+  color: #24468a;
+  background: #e2ecff;
+}
+
+.controls {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.controls button {
+  border: 1px solid var(--edge);
+  background: linear-gradient(180deg, #fdfaf4 0%, #f4eee3 100%);
+  color: var(--text-strong);
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.7rem;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.controls button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 25px rgba(35, 45, 70, 0.08);
+}
+
+@media (max-width: 760px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+}
+

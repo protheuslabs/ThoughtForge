@@ -1,0 +1,13 @@
+[package]
+name = "tf-cli"
+edition.workspace = true
+license.workspace = true
+version.workspace = true
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tf-agent-runtime = { path = "../tf-agent-runtime" }
+tf-context-compiler = { path = "../tf-context-compiler" }
+tf-context-daemon = { path = "../tf-context-daemon" }
+tf-domain = { path = "../tf-domain" }

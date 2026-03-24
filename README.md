@@ -109,6 +109,8 @@ Defer from MVP unless they are required by design:
 ## Repo Docs
 
 - [SRS](./docs/SRS.md)
+- [SRS Execution Plan](./docs/SRS_EXECUTION_PLAN.md)
+- [SRS Execution Matrix](./docs/SRS_EXECUTION_MATRIX.md)
 - [Architecture](./docs/ARCHITECTURE.md)
 - [Planning](./docs/PLANNING.md)
 - [Agent Context Strategy](./docs/AGENT_CONTEXT_STRATEGY.md)
@@ -117,30 +119,32 @@ Defer from MVP unless they are required by design:
 - [Delegation and Policy Model](./docs/DELEGATION_AND_POLICY_MODEL.md)
 - [Name Decision](./docs/NAMES.md)
 
-## Suggested Repo Layout
+## Working Repo Layout
 
 ```text
 apps/
   desktop/
+    src-tauri/
 crates/
-  app-core/
-  domain/
-  vault/
-  context-model/
-  context-daemon/
-  context-compiler/
-  policy-engine/
-  simulation/
-  indexer/
-  agent-runtime/
-  connectors/
-  sync/
-  plugin-host/
-packages/
-  ui/
-  editor/
-  shared-types/
+  tf-domain/
+  tf-storage/
+  tf-context-daemon/
+  tf-context-compiler/
+  tf-agent-runtime/
+scripts/
+  generate_srs_execution_matrix.sh
 docs/
+```
+
+## Build Commands
+
+```bash
+npm run desktop:install
+npm run desktop:dev
+npm run srs:matrix
+npm run srs:verify-full
+npm run cli -- srs-status --matrix docs/SRS_EXECUTION_MATRIX.md
+cargo test --workspace
 ```
 
 ## Decision Summary

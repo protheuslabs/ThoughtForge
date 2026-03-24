@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Thoughtforge",
+  "version": "0.1.0",
+  "identifier": "com.protheuslabs.thoughtforge",
+  "build": {
+    "beforeDevCommand": "npm --prefix .. run dev",
+    "beforeBuildCommand": "npm --prefix .. run build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Thoughtforge",
+        "width": 1400,
+        "height": 900,
+        "resizable": true
+      }
+    ]
+  }
+}
+

@@ -4,8 +4,8 @@
 
 - Product: Thoughtforge
 - Document type: Software Requirements Specification
-- Version: 0.3
-- Date: 2026-03-15
+- Version: 0.4
+- Date: 2026-03-17
 - Status: Draft for product-definition phase
 
 ## 2. Purpose
@@ -28,6 +28,8 @@ The product includes:
 - agent-readable context and tool surfaces
 - open visual workspace artifacts and structured view definitions
 - deterministic command-line automation
+- workspace stewardship, repair, and decay-prevention workflows
+- progressive formalization from raw evidence into typed context
 - search, retrieval, resurfacing, and summarization
 - external grounding via connected systems
 - import/export and migration paths
@@ -50,6 +52,7 @@ The product does not initially include:
 - model active state, not just documents
 - reduce the need for users to restate context across sessions
 - support fast thought capture and high-fidelity retrieval
+- prevent workspace decay and abandonment through supervised maintenance
 - build trust through permissions, provenance, freshness, authority, and reversibility
 
 ### 4.2 Non-Goals for MVP
@@ -83,6 +86,8 @@ The product does not initially include:
 - context objects are first-class
 - live state matters more than static documents
 - separate authored truth from derived inference
+- maintenance is a product capability, not user housekeeping
+- progressive formalization beats forced upfront structure
 - freshness, authority, provenance, and approval are explicit
 - security and policy before autonomy
 - fast enough to feel invisible
@@ -103,6 +108,8 @@ Thoughtforge manages one or more local vaults containing Markdown notes, attachm
 A context daemon continuously observes local events and selected external systems, reconciles new information into the workspace model, and emits state deltas when plans, commitments, or reality shift.
 
 Agents do not operate on raw files directly. They consume task-specific context bundles produced by a context compiler, cite provenance, respect freshness and authority markers, comply with delegation policies, and perform approved actions through a permissioned command layer.
+
+The system also acts as a workspace steward. It should detect decay such as inbox buildup, stale commitments, orphaned evidence, broken links, duplicate candidates, and under-structured captures, then propose or execute approved maintenance workflows that keep the workspace useful over time.
 
 ## 9. Functional Requirements
 
@@ -213,6 +220,12 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - FR-CX-009 (Should): The system should support promoting freeform notes or blocks into typed context objects.
   Acceptance: A user or agent can convert a block into a decision, commitment, or resource without losing provenance.
 
+- FR-CX-010 (Should): The system should support progressive formalization from raw evidence into typed context objects, with confidence, review state, and preserved source linkage.
+  Acceptance: The system can propose candidate tasks, decisions, commitments, constraints, or resources from raw captures without silently promoting them into canonical truth.
+
+- FR-CX-011 (Should): The system should support canonical project operating dossiers that summarize goals, current state, key decisions, constraints, open questions, blockers, and next actions for a project.
+  Acceptance: A project can expose a durable machine-readable summary that can be inspected, edited, cited, and refreshed over time.
+
 ### 9.5 Live Models
 
 - FR-LM-001 (Must): The system shall maintain a self model containing user preferences, communication style, working style, and risk tolerance.
@@ -264,6 +277,15 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - FR-CD-005 (Should): The context daemon should prepare candidate context bundles for likely next actions.
   Acceptance: A user can open a task or project and see a precompiled suggested bundle.
 
+- FR-CD-006 (Should): The context daemon should detect workspace decay signals such as inbox accumulation, orphaned evidence, broken links, duplicate candidates, stale commitments, and outdated working sets.
+  Acceptance: The user can inspect a maintenance queue explaining what needs attention and why.
+
+- FR-CD-007 (Should): The context daemon should support recurring maintenance workflows such as inbox cleanup, stale-item review, working set refresh, graph repair, and metadata backfill.
+  Acceptance: The system can prepare or run approved maintenance jobs and report the resulting state changes.
+
+- FR-CD-008 (Should): The context daemon should detect when a project operating dossier or resume bundle is stale relative to recent evidence, decisions, tasks, or external changes.
+  Acceptance: The system can flag a dossier or handoff bundle for refresh when relevant project state changes.
+
 ### 9.8 Context Compilation
 
 - FR-CC-001 (Must): The system shall compile task-specific context bundles for agent work.
@@ -280,6 +302,12 @@ Agents do not operate on raw files directly. They consume task-specific context 
 
 - FR-CC-005 (Should): The system should consider policy state and delegation boundaries during bundle assembly.
   Acceptance: A bundle can expose execution limits relevant to the requested action.
+
+- FR-CC-006 (Should): The system should support project resume bundles that rehydrate an agent with the current goal, state, architecture, decisions, blockers, constraints, and next actions of a project.
+  Acceptance: A user can trigger a resume flow and receive a project-scoped bundle suitable for bringing a fresh agent session up to speed.
+
+- FR-CC-007 (Should): The system should support handoff bundles for transferring project context between users, sessions, or agents.
+  Acceptance: A handoff bundle can summarize what matters now, what changed recently, and what remains unresolved with source linkage.
 
 ### 9.9 Search, Retrieval, and Resurfacing
 
@@ -306,6 +334,12 @@ Agents do not operate on raw files directly. They consume task-specific context 
 
 - FR-SR-008 (Should): The system should support structured view definitions for filters, grouping, formulas, and dashboards over evidence and context objects.
   Acceptance: A structured view definition remains human-readable, editable, and executable by the app and agents.
+
+- FR-SR-009 (Should): The system should surface maintenance-oriented queues and views for stale, uncategorized, orphaned, duplicate, or review-needed workspace state.
+  Acceptance: A user can open a maintenance view and act on ranked cleanup or formalization candidates.
+
+- FR-SR-010 (Should): The system should support project startup and operating templates that create recommended views, dossiers, and object scaffolds for common workflows.
+  Acceptance: A user can initialize a project context from a template without forcing a specific folder hierarchy.
 
 ### 9.10 Knowledge Graph and Structured Context
 
@@ -361,6 +395,15 @@ Agents do not operate on raw files directly. They consume task-specific context 
 
 - FR-AG-011 (Must): The system shall validate agent-generated native artifacts against format schemas before applying them.
   Acceptance: Generated Markdown, visual documents, and view definitions are checked before durable write.
+
+- FR-AG-012 (Should): The system should support workspace stewardship workflows through typed agent actions such as clean inbox, repair links, merge duplicates, restructure project areas, archive stale material, and backfill metadata.
+  Acceptance: A user can invoke a stewardship workflow from the workspace and review the planned changes before execution.
+
+- FR-AG-013 (Should): The system should support supervised bulk refactors over notes, objects, relationships, metadata, and views with previews, validation, and rollback guidance.
+  Acceptance: A bulk restructure produces an inspectable plan and only applies validated changes within approved scope.
+
+- FR-AG-014 (Should): The system should support explicit resume-project and handoff-project agent actions that operate on project dossiers and compiled bundles rather than ad hoc chat history.
+  Acceptance: A user can invoke a resume or handoff workflow from a project and inspect the resulting context package before use.
 
 ### 9.12 Delegation, Approval, and Simulation
 
@@ -491,6 +534,7 @@ Agents do not operate on raw files directly. They consume task-specific context 
 - NFR-014 Provenance quality: Agent-visible outputs shall retain source references and context bundle identifiers.
 - NFR-015 Cross-platform support: The architecture shall support macOS, Windows, and Linux even if release sequencing starts with macOS.
 - NFR-016 Artifact validity: Supported native artifact formats shall be schema-validated before durable writes are committed.
+- NFR-017 Maintenance safety: Automated stewardship and bulk refactors shall default to previewable, bounded, and reversible behavior where technically feasible.
 
 ## 11. External Interface Requirements
 
@@ -546,6 +590,7 @@ Agents do not operate on raw files directly. They consume task-specific context 
 
 - Intents, projects, tasks, decisions, commitments, constraints, resources, conversations, delegations, approvals, and state deltas shall have canonical local records with stable IDs.
 - Canonical context objects shall be linkable to authored evidence and to each other.
+- Candidate formalizations shall preserve source linkage, confidence, and review state until promoted.
 
 ### 12.3 Live Models
 
@@ -591,8 +636,13 @@ MVP is acceptable when all of the following are true:
 - Self, world, temporal, and attention models can be inspected and updated at a useful baseline level.
 - The working set can show what is active, blocked, stale, noisy, and waiting for review.
 - The context daemon can reconcile ordinary workspace changes and surface meaningful deltas.
+- The system can surface a maintenance queue containing stale, orphaned, duplicate, or under-structured workspace state.
+- Projects can maintain inspectable operating dossiers that summarize current state, decisions, blockers, constraints, and next actions.
 - The agent can compile a context bundle, explain it, and act from it with provenance.
+- The user or agent can propose formalization of raw captures into typed objects without losing provenance.
+- The system can generate a project resume bundle or handoff bundle without relying on prior chat history.
 - The system can create, validate, and persist at least one open visual artifact type and one structured view definition type.
+- The user can preview and approve at least one stewardship workflow or bulk workspace refactor before changes are applied.
 - The CLI can perform core read and write automation for notes, objects, or views with deterministic output.
 - The user can approve or deny write actions, delegation escalation, and memory promotions at a granular level.
 - External evidence edits do not corrupt the workspace model.
@@ -615,6 +665,7 @@ MVP is acceptable when all of the following are true:
 - over-structuring the knowledge model can slow capture and reduce adoption
 - under-structuring the product can leave the agent reconstructing context from scratch forever
 - an intrusive or opaque daemon can feel like surveillance rather than assistance
+- over-eager maintenance or refactoring can damage user trust if cleanup actions feel arbitrary, lossy, or stylistically invasive
 
 ## 17. Glossary
 
@@ -625,7 +676,10 @@ MVP is acceptable when all of the following are true:
 - Working set: The currently active set of goals, tasks, constraints, and evidence relevant to near-term work.
 - Context daemon: A service that continuously reconciles changes into the live workspace model.
 - Context compiler: A service that assembles task-specific bundles for agent work.
+- Project operating dossier: A durable project summary containing goals, state, decisions, blockers, constraints, and next actions.
 - Projection: Derived data optimized for search, graph queries, or UI use.
 - Intent: A first-class object representing desired outcome, focus, or plan.
+- Progressive formalization: Incremental conversion of raw evidence into typed context objects with review and provenance.
+- Workspace stewardship: Ongoing maintenance workflows that keep the workspace organized, current, and agent-usable over time.
 - Agent-native: Designed so software agents can understand and operate on workspace context directly.
 - Local-first: The product remains useful and authoritative on the local device even when offline.
