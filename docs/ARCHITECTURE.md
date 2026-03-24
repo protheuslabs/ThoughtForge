@@ -145,6 +145,20 @@ Recommended split:
 - Projections: search index, graph index, working set index, freshness index, authority index, embeddings index, audit history
 - Native artifact layer: serializers and validators for Markdown, visual workspace docs, and structured view definitions
 
+### 3.3 Workspace Interaction Core
+
+Assimilate proven interaction architecture from Obsidian while preserving Thoughtforge goals:
+
+- global command bus with stable command IDs and scoped handlers
+- global event bus for UI and daemon state propagation
+- keyboard-first command palette and quick switcher surfaces
+- layout manager with tabs, splits, and pinned panes
+- core-plugin host with bounded capability scopes
+- `thoughtforge://` deep-link protocol for vault or note routing and scoped actions
+- status bar for active vault, mode, and runtime state visibility
+
+These interaction primitives are required so agents and humans can share one deterministic control surface rather than separate chat-only workflows.
+
 ## 4. System Topology
 
 ```mermaid
@@ -182,6 +196,8 @@ Responsibilities:
 - watch filesystem changes
 - map stable evidence IDs to file paths
 - maintain workspace settings and policies
+- isolate app metadata under `.thoughtforge/` away from authored evidence
+- restore workspace session state (active vault, tabs, splits, and sidebars) across restarts
 
 ### 5.2 Evidence and Authoring Context
 

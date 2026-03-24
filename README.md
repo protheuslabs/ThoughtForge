@@ -144,6 +144,17 @@ npm run desktop:dev
 npm run srs:matrix
 npm run srs:verify-full
 npm run cli -- srs-status --matrix docs/SRS_EXECUTION_MATRIX.md
+npm run cli -- list-commands
+npm run cli -- list-core-plugins
+npm run cli -- vault-create --path /path/to/vault --name "Main Vault"
+npm run cli -- vault-list
+npm run cli -- vault-switch --vault-id <vault_id>
+npm run cli -- index-vault --path /path/to/vault
+npm run cli -- backlinks --path /path/to/vault --note "Project Dossier"
+npm run cli -- note-create --path /path/to/vault --title "Captured Idea"
+npm run cli -- note-append --path /path/to/vault --note "00 Inbox/Inbox.md" --text "- [ ] Follow up"
+npm run cli -- snapshot-vault --path /path/to/vault
+npm run cli -- detect-edits --path /path/to/vault --previous /tmp/vault-snapshot.json
 cargo test --workspace
 ```
 

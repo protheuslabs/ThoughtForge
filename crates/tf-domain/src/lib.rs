@@ -73,6 +73,138 @@ pub struct ContextBundle {
     pub items: Vec<BundleItem>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandScope {
+    App,
+    Workspace,
+    Editor,
+    Search,
+    Graph,
+    Agent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkspaceCommand {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub hotkeys: Vec<String>,
+    pub scope: CommandScope,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommandExecutionEvent {
+    pub command_id: String,
+    pub source: String,
+    pub target: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkspaceEventKind {
+    VaultOpened,
+    VaultClosed,
+    NoteCreated,
+    NoteRenamed,
+    NoteDeleted,
+    LayoutChanged,
+    CommandExecuted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkspaceEvent {
+    pub kind: WorkspaceEventKind,
+    pub summary: String,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndexedNote {
+    pub id: String,
+    pub path: String,
+    pub title: String,
+    pub tags: Vec<String>,
+    pub links: Vec<String>,
+    pub updated_at: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultIndex {
+    pub vault_root: String,
+    pub notes: Vec<IndexedNote>,
+    pub backlinks: Vec<(String, Vec<String>)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultRegistration {
+    pub id: String,
+    pub name: String,
+    pub root_path: String,
+    pub last_opened_at: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkspaceRegistry {
+    pub active_vault_id: Option<String>,
+    pub vaults: Vec<VaultRegistration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoteIdentityRecord {
+    pub note_id: String,
+    pub path: String,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultNoteIdentityState {
+    pub version: u32,
+    pub records: Vec<NoteIdentityRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CorePluginSpec {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub hooks: Vec<String>,
+    pub command_ids: Vec<String>,
+    pub capability_scopes: Vec<CommandScope>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultFileSnapshot {
+    pub path: String,
+    pub bytes: u64,
+    pub modified_at: Option<u64>,
+    pub fingerprint: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultScanSnapshot {
+    pub vault_root: String,
+    pub scanned_at: u64,
+    pub files: Vec<VaultFileSnapshot>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VaultFileChangeKind {
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultFileChange {
+    pub kind: VaultFileChangeKind,
+    pub path: String,
+    pub previous_path: Option<String>,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorkspaceSnapshot {
     pub inbox_count: u32,
@@ -152,6 +284,15 @@ mod tests {
             summary: "Compile task-specific context bundles.".to_string(),
         };
         assert_eq!(req.id, "FR-CC-001");
+
+        let command = WorkspaceCommand {
+            id: "command-palette:open".to_string(),
+            name: "Open command palette".to_string(),
+            description: "Open global command picker".to_string(),
+            hotkeys: vec!["Mod+P".to_string()],
+            scope: CommandScope::App,
+        };
+        assert_eq!(command.scope, CommandScope::App);
     }
 
     #[test]

@@ -11,3 +11,4 @@ tf-agent-runtime = { path = "../tf-agent-runtime" }
 tf-context-compiler = { path = "../tf-context-compiler" }
 tf-context-daemon = { path = "../tf-context-daemon" }
 tf-domain = { path = "../tf-domain" }
+tf-storage = { path = "../tf-storage" }

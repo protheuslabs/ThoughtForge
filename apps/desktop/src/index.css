@@ -1,16 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg: #f0ede6;
-  --surface: #fffdf9;
-  --surface-low: #faf6ef;
-  --chip: #fff7ec;
-  --edge: #ddcdb6;
-  --text: #3b2f21;
-  --text-strong: #1f1711;
-  --muted: #695744;
-  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+body[data-theme='dark'] {
+  --bg: #171a1f;
+  --surface-base: #20242b;
+  --surface-elevated: #272d36;
+  --surface-hover: #2f3743;
+  --surface-active: #394454;
+  --edge: #3f4a5c;
+  --text: #d7dee8;
+  --text-strong: #f2f6fd;
+  --text-muted: #a8b1be;
+  --text-dim: #8c96a7;
+  --accent: #79b4ff;
+}
+
+body[data-theme='light'] {
+  --bg: #e6ebf3;
+  --surface-base: #f9fbff;
+  --surface-elevated: #f2f5fb;
+  --surface-hover: #e8edf7;
+  --surface-active: #dce4f2;
+  --edge: #c1ccdd;
+  --text: #2e3745;
+  --text-strong: #101722;
+  --text-muted: #4f6079;
+  --text-dim: #6f7f96;
+  --accent: #155ee8;
 }
 
 *,
@@ -21,41 +41,27 @@
 
 body {
   margin: 0;
-  min-height: 100svh;
-  background:
-    radial-gradient(circle at 20% -10%, rgba(255, 214, 170, 0.55), transparent 40%),
-    radial-gradient(circle at 100% 0%, rgba(193, 219, 255, 0.45), transparent 28%),
-    var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
+  min-height: 100dvh;
+  font-family: var(--font-sans);
   line-height: 1.45;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 12% 4%, rgba(121, 180, 255, 0.18), transparent 32%),
+    radial-gradient(circle at 88% -2%, rgba(91, 243, 180, 0.11), transparent 24%),
+    var(--bg);
 }
 
 #root {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 1.2rem;
+  padding: 0.8rem;
+  max-width: 100%;
 }
 
 h1,
 h2,
 h3 {
-  margin: 0 0 0.55rem;
-  color: var(--text-strong);
-  font-weight: 600;
+  margin: 0;
 }
 
-h1 {
-  font-size: clamp(1.65rem, 3.2vw, 2.45rem);
+:root {
+  color-scheme: dark light;
 }
-
-h2 {
-  font-size: 1.15rem;
-}
-
-@media (max-width: 760px) {
-  #root {
-    padding: 0.9rem;
-  }
-}
-

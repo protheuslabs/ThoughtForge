@@ -1,5 +1,122 @@
 use tf_context_compiler::{compile_handoff_bundle, compile_resume_bundle};
-use tf_domain::{AgentActionPlan, ProjectDossier};
+use tf_domain::{AgentActionPlan, CommandScope, CorePluginSpec, ProjectDossier, WorkspaceCommand};
+
+pub fn builtin_workspace_commands() -> Vec<WorkspaceCommand> {
+    vec![
+        WorkspaceCommand {
+            id: "command-palette:open".to_string(),
+            name: "Open command palette".to_string(),
+            description: "Show global command registry and execute commands".to_string(),
+            hotkeys: vec!["Mod+P".to_string()],
+            scope: CommandScope::App,
+        },
+        WorkspaceCommand {
+            id: "switcher:open".to_string(),
+            name: "Open quick switcher".to_string(),
+            description: "Find and open notes by title or path".to_string(),
+            hotkeys: vec!["Mod+O".to_string()],
+            scope: CommandScope::Workspace,
+        },
+        WorkspaceCommand {
+            id: "file-explorer:new-file".to_string(),
+            name: "Create new note".to_string(),
+            description: "Create a note in the active vault".to_string(),
+            hotkeys: vec!["Mod+N".to_string()],
+            scope: CommandScope::Workspace,
+        },
+        WorkspaceCommand {
+            id: "markdown:toggle-preview".to_string(),
+            name: "Toggle markdown preview".to_string(),
+            description: "Switch between source and rendered note modes".to_string(),
+            hotkeys: vec!["Mod+E".to_string()],
+            scope: CommandScope::Editor,
+        },
+        WorkspaceCommand {
+            id: "workspace:split-vertical".to_string(),
+            name: "Split editor vertically".to_string(),
+            description: "Open split view for source and preview panes".to_string(),
+            hotkeys: vec!["Mod+\\".to_string()],
+            scope: CommandScope::Editor,
+        },
+        WorkspaceCommand {
+            id: "app:toggle-left-sidebar".to_string(),
+            name: "Toggle left sidebar".to_string(),
+            description: "Show or hide the navigation and file explorer".to_string(),
+            hotkeys: vec!["Mod+Alt+Left".to_string()],
+            scope: CommandScope::App,
+        },
+        WorkspaceCommand {
+            id: "app:toggle-right-sidebar".to_string(),
+            name: "Toggle right sidebar".to_string(),
+            description: "Show or hide backlinks and note inspector".to_string(),
+            hotkeys: vec!["Mod+Alt+Right".to_string()],
+            scope: CommandScope::App,
+        },
+    ]
+}
+
+pub fn builtin_core_plugins() -> Vec<CorePluginSpec> {
+    vec![
+        CorePluginSpec {
+            id: "file-explorer".to_string(),
+            name: "File Explorer".to_string(),
+            description: "Vault tree navigation, note operations, and metadata routing."
+                .to_string(),
+            hooks: vec![
+                "on_app_start".to_string(),
+                "on_vault_open".to_string(),
+                "on_note_create".to_string(),
+            ],
+            command_ids: vec![
+                "file-explorer:new-file".to_string(),
+                "switcher:open".to_string(),
+            ],
+            capability_scopes: vec![CommandScope::Workspace, CommandScope::App],
+        },
+        CorePluginSpec {
+            id: "editor".to_string(),
+            name: "Markdown Editor".to_string(),
+            description: "Source/preview editing, split panes, and markdown command handling."
+                .to_string(),
+            hooks: vec![
+                "on_note_open".to_string(),
+                "on_note_save".to_string(),
+                "on_layout_change".to_string(),
+            ],
+            command_ids: vec![
+                "markdown:toggle-preview".to_string(),
+                "workspace:split-vertical".to_string(),
+            ],
+            capability_scopes: vec![CommandScope::Editor, CommandScope::Workspace],
+        },
+        CorePluginSpec {
+            id: "command-palette".to_string(),
+            name: "Command Palette".to_string(),
+            description: "Global command registry and dispatch control surface.".to_string(),
+            hooks: vec![
+                "on_app_start".to_string(),
+                "on_command_register".to_string(),
+                "on_command_execute".to_string(),
+            ],
+            command_ids: vec![
+                "command-palette:open".to_string(),
+                "app:toggle-left-sidebar".to_string(),
+                "app:toggle-right-sidebar".to_string(),
+            ],
+            capability_scopes: vec![CommandScope::App, CommandScope::Workspace],
+        },
+    ]
+}
+
+pub fn commands_from_plugins(plugins: &[CorePluginSpec]) -> Vec<String> {
+    let mut command_ids = plugins
+        .iter()
+        .flat_map(|plugin| plugin.command_ids.clone())
+        .collect::<Vec<_>>();
+    command_ids.sort();
+    command_ids.dedup();
+    command_ids
+}
 
 pub fn plan_resume_project(dossier: &ProjectDossier) -> AgentActionPlan {
     AgentActionPlan {
@@ -50,5 +167,30 @@ mod tests {
         let action = plan_handoff_project(&dossier(), "ops-agent");
         assert_eq!(action.action_type, "handoff_project");
         assert!(action.requires_approval);
+    }
+
+    #[test]
+    fn exposes_builtin_workspace_commands() {
+        let commands = builtin_workspace_commands();
+        assert!(
+            commands
+                .iter()
+                .any(|command| command.id == "command-palette:open")
+        );
+        assert!(commands.iter().any(|command| command.id == "switcher:open"));
+    }
+
+    #[test]
+    fn exposes_builtin_core_plugins_and_registered_commands() {
+        let plugins = builtin_core_plugins();
+        assert!(plugins.iter().any(|plugin| plugin.id == "file-explorer"));
+
+        let command_ids = commands_from_plugins(&plugins);
+        assert!(command_ids.iter().any(|id| id == "command-palette:open"));
+        assert!(
+            command_ids
+                .iter()
+                .any(|id| id == "workspace:split-vertical")
+        );
     }
 }

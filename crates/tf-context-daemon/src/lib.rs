@@ -1,4 +1,10 @@
-use tf_domain::{DecaySignal, DecaySignalKind, WorkspaceSnapshot};
+use std::io;
+use std::path::Path;
+
+use tf_domain::{
+    DecaySignal, DecaySignalKind, VaultFileChange, VaultScanSnapshot, WorkspaceSnapshot,
+};
+use tf_storage::{diff_snapshots, snapshot_vault_files};
 
 fn detect_metric_decay(
     count: u32,
@@ -86,9 +92,29 @@ pub fn detect_decay(snapshot: &WorkspaceSnapshot) -> Vec<DecaySignal> {
     signals
 }
 
+pub fn capture_vault_snapshot(vault_root: &Path) -> io::Result<VaultScanSnapshot> {
+    snapshot_vault_files(vault_root)
+}
+
+pub fn reconcile_vault_snapshots(
+    previous: &VaultScanSnapshot,
+    current: &VaultScanSnapshot,
+) -> Vec<VaultFileChange> {
+    diff_snapshots(previous, current)
+}
+
+pub fn detect_external_edits(
+    vault_root: &Path,
+    previous: &VaultScanSnapshot,
+) -> io::Result<Vec<VaultFileChange>> {
+    let current = capture_vault_snapshot(vault_root)?;
+    Ok(reconcile_vault_snapshots(previous, &current))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tf_domain::VaultFileChangeKind;
 
     #[test]
     fn returns_decay_signals_for_non_zero_metrics() {
@@ -123,5 +149,36 @@ mod tests {
 
         let signals = detect_decay(&snapshot);
         assert!(signals.is_empty());
+    }
+
+    #[test]
+    fn computes_changes_between_snapshots() {
+        let before = VaultScanSnapshot {
+            vault_root: "/tmp/example".to_string(),
+            scanned_at: 1,
+            files: vec![tf_domain::VaultFileSnapshot {
+                path: "a.md".to_string(),
+                bytes: 5,
+                modified_at: Some(1),
+                fingerprint: "aaa".to_string(),
+            }],
+        };
+        let after = VaultScanSnapshot {
+            vault_root: "/tmp/example".to_string(),
+            scanned_at: 2,
+            files: vec![tf_domain::VaultFileSnapshot {
+                path: "a.md".to_string(),
+                bytes: 8,
+                modified_at: Some(2),
+                fingerprint: "bbb".to_string(),
+            }],
+        };
+
+        let changes = reconcile_vault_snapshots(&before, &after);
+        assert!(
+            changes
+                .iter()
+                .any(|change| change.kind == VaultFileChangeKind::Modified)
+        );
     }
 }

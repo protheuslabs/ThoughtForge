@@ -2,11 +2,18 @@ use std::env;
 use std::path::Path;
 
 use serde_json::json;
-use tf_agent_runtime::{plan_handoff_project, plan_resume_project};
+use tf_agent_runtime::{
+    builtin_core_plugins, builtin_workspace_commands, commands_from_plugins, plan_handoff_project,
+    plan_resume_project,
+};
 use tf_context_compiler::{compile_handoff_bundle, compile_resume_bundle, compile_task_bundle};
-use tf_context_daemon::detect_decay;
+use tf_context_daemon::{capture_vault_snapshot, detect_decay, detect_external_edits};
 use tf_domain::{
     DiagnosticEvent, DiagnosticLevel, ProjectDossier, WorkspaceSnapshot, append_diagnostic_jsonl,
+};
+use tf_storage::{
+    append_to_note, backlinks_for_note, create_markdown_note, create_vault, index_vault_markdown,
+    load_workspace_registry, register_or_open_vault, switch_active_vault,
 };
 
 const DIAGNOSTIC_LOG_PATH: &str = "logs/diagnostics.jsonl";
@@ -71,6 +78,122 @@ fn run() -> Result<(), String> {
             let plan = plan_handoff_project(&dossier, &recipient);
             print_json(&plan)?;
         }
+        "list-commands" => {
+            let commands = builtin_workspace_commands();
+            print_json(&commands)?;
+        }
+        "list-core-plugins" => {
+            let plugins = builtin_core_plugins();
+            let registered_command_ids = commands_from_plugins(&plugins);
+            print_json(&json!({
+                "plugins": plugins,
+                "registered_command_ids": registered_command_ids
+            }))?;
+        }
+        "vault-create" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            create_vault(Path::new(&vault_path))
+                .map_err(|error| format!("failed to create vault {vault_path}: {error}"))?;
+
+            let registry_path = optional_flag_value(&tail, "--registry")
+                .unwrap_or_else(|| ".thoughtforge/workspace_registry.json".to_string());
+            let name = optional_flag_value(&tail, "--name");
+            let registry = register_or_open_vault(
+                Path::new(&registry_path),
+                Path::new(&vault_path),
+                name.as_deref(),
+            )
+            .map_err(|error| format!("failed to register vault {vault_path}: {error}"))?;
+            print_json(&registry)?;
+        }
+        "vault-open" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let registry_path = optional_flag_value(&tail, "--registry")
+                .unwrap_or_else(|| ".thoughtforge/workspace_registry.json".to_string());
+            let name = optional_flag_value(&tail, "--name");
+            let registry = register_or_open_vault(
+                Path::new(&registry_path),
+                Path::new(&vault_path),
+                name.as_deref(),
+            )
+            .map_err(|error| format!("failed to open vault {vault_path}: {error}"))?;
+            print_json(&registry)?;
+        }
+        "vault-switch" => {
+            let vault_id = flag_value(&tail, "--vault-id")?;
+            let registry_path = optional_flag_value(&tail, "--registry")
+                .unwrap_or_else(|| ".thoughtforge/workspace_registry.json".to_string());
+            let registry = switch_active_vault(Path::new(&registry_path), &vault_id)
+                .map_err(|error| format!("failed to switch vault {vault_id}: {error}"))?;
+            print_json(&registry)?;
+        }
+        "vault-list" => {
+            let registry_path = optional_flag_value(&tail, "--registry")
+                .unwrap_or_else(|| ".thoughtforge/workspace_registry.json".to_string());
+            let registry = load_workspace_registry(Path::new(&registry_path))
+                .map_err(|error| format!("failed to load registry {registry_path}: {error}"))?;
+            print_json(&registry)?;
+        }
+        "note-create" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let title = flag_value(&tail, "--title")?;
+            let folder = optional_flag_value(&tail, "--folder");
+            let body = optional_flag_value(&tail, "--body");
+            let note_path = create_markdown_note(
+                Path::new(&vault_path),
+                folder.as_deref(),
+                &title,
+                body.as_deref(),
+            )
+            .map_err(|error| format!("failed to create note in {vault_path}: {error}"))?;
+            print_json(&json!({
+                "vault": vault_path,
+                "note_path": note_path
+            }))?;
+        }
+        "note-append" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let note_path = flag_value(&tail, "--note")?;
+            let text = flag_value(&tail, "--text")?;
+            append_to_note(Path::new(&vault_path), &note_path, &text)
+                .map_err(|error| format!("failed to append note {note_path}: {error}"))?;
+            print_json(&json!({
+                "vault": vault_path,
+                "note_path": note_path,
+                "appended": true
+            }))?;
+        }
+        "index-vault" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let index = index_vault_markdown(Path::new(&vault_path))
+                .map_err(|error| format!("failed to index vault {vault_path}: {error}"))?;
+            print_json(&index)?;
+        }
+        "backlinks" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let note_ref = flag_value(&tail, "--note")?;
+            let index = index_vault_markdown(Path::new(&vault_path))
+                .map_err(|error| format!("failed to index vault {vault_path}: {error}"))?;
+            let backlinks = backlinks_for_note(&index, &note_ref);
+            print_json(&json!({
+                "note": note_ref,
+                "backlinks": backlinks
+            }))?;
+        }
+        "snapshot-vault" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let snapshot = capture_vault_snapshot(Path::new(&vault_path))
+                .map_err(|error| format!("failed to snapshot vault {vault_path}: {error}"))?;
+            print_json(&snapshot)?;
+        }
+        "detect-edits" => {
+            let vault_path = flag_value(&tail, "--path")?;
+            let previous_snapshot_path = flag_value(&tail, "--previous")?;
+            let previous: tf_domain::VaultScanSnapshot = read_json_file(&previous_snapshot_path)?;
+            let changes = detect_external_edits(Path::new(&vault_path), &previous)
+                .map_err(|error| format!("failed to detect edits for {vault_path}: {error}"))?;
+            print_json(&changes)?;
+        }
         "srs-status" => {
             let matrix_path = flag_value(&tail, "--matrix")?;
             let contents = std::fs::read_to_string(&matrix_path)
@@ -116,7 +239,7 @@ fn run() -> Result<(), String> {
 
 fn usage(message: String) -> String {
     format!(
-        "{message}\nUsage:\n  tf-cli compile-task --dossier <path> --objective <text>\n  tf-cli compile-resume --dossier <path>\n  tf-cli compile-handoff --dossier <path> --recipient <id>\n  tf-cli detect-decay --snapshot <path>\n  tf-cli plan-resume --dossier <path>\n  tf-cli plan-handoff --dossier <path> --recipient <id>\n  tf-cli srs-status --matrix <path>"
+        "{message}\nUsage:\n  tf-cli compile-task --dossier <path> --objective <text>\n  tf-cli compile-resume --dossier <path>\n  tf-cli compile-handoff --dossier <path> --recipient <id>\n  tf-cli detect-decay --snapshot <path>\n  tf-cli plan-resume --dossier <path>\n  tf-cli plan-handoff --dossier <path> --recipient <id>\n  tf-cli list-commands\n  tf-cli list-core-plugins\n  tf-cli vault-create --path <vault_dir> [--name <name>] [--registry <path>]\n  tf-cli vault-open --path <vault_dir> [--name <name>] [--registry <path>]\n  tf-cli vault-switch --vault-id <id> [--registry <path>]\n  tf-cli vault-list [--registry <path>]\n  tf-cli note-create --path <vault_dir> --title <title> [--folder <folder>] [--body <text>]\n  tf-cli note-append --path <vault_dir> --note <relative_path> --text <text>\n  tf-cli index-vault --path <vault_dir>\n  tf-cli backlinks --path <vault_dir> --note <title_or_path>\n  tf-cli snapshot-vault --path <vault_dir>\n  tf-cli detect-edits --path <vault_dir> --previous <snapshot_json>\n  tf-cli srs-status --matrix <path>"
     )
 }
 
@@ -128,6 +251,11 @@ fn flag_value(args: &[String], name: &str) -> Result<String, String> {
     args.get(idx + 1)
         .cloned()
         .ok_or_else(|| format!("missing value for flag {name}"))
+}
+
+fn optional_flag_value(args: &[String], name: &str) -> Option<String> {
+    let idx = args.iter().position(|entry| entry == name)?;
+    args.get(idx + 1).cloned()
 }
 
 fn read_json_file<T>(path: &str) -> Result<T, String>

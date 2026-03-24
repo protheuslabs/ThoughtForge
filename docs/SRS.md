@@ -136,6 +136,12 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 - FR-WV-007 (Should): The system should support encrypted app secrets and provider credentials.
   Acceptance: API keys are stored outside evidence files and can be revoked.
 
+- FR-WV-008 (Should): The system should support deep-link protocol actions using `thoughtforge://` URIs for opening vaults, notes, and agent-safe actions.
+  Acceptance: A protocol link can open a specific note or launch a scoped workspace action without requiring chat mediation.
+
+- FR-WV-009 (Should): The system should restore the previous workspace session including active vault, open tabs, and layout state on startup.
+  Acceptance: Restarting the app can reopen the prior session context without manual reconstruction.
+
 ### 9.2 Capture and Ingestion
 
 - FR-CI-001 (Must): The system shall support instant creation of a new note from keyboard-driven flows.
@@ -155,6 +161,9 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 
 - FR-CI-006 (Should): The system should support ingestion pipelines for PDFs, web pages, code files, transcripts, and meeting recordings.
   Acceptance: Imported sources produce evidence plus extracted metadata.
+
+- FR-CI-007 (Should): The system should support configurable daily-note capture and append flows.
+  Acceptance: A daily note target can be opened or appended from one keyboard-first command.
 
 ### 9.3 Editor and Evidence Authoring
 
@@ -190,6 +199,27 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 
 - FR-ED-011 (Should): The system should support schema-validated native artifact generation for supported workspace formats.
   Acceptance: An invalid generated artifact is blocked or repaired before durable write.
+
+- FR-ED-012 (Must): The system shall provide a global command palette with stable command identifiers for workspace and agent actions.
+  Acceptance: Users can execute supported actions from a keyboard-driven command palette that exposes command IDs, labels, and keybindings.
+
+- FR-ED-013 (Should): The system should provide a quick switcher for low-latency note and object navigation.
+  Acceptance: Users can fuzzy-search and open a note or object from one keyboard-first interaction.
+
+- FR-ED-014 (Should): The system should provide a persistent workspace layout manager supporting tabs, pinning, and split panes.
+  Acceptance: Open tabs, pin state, and split state can be restored after restart.
+
+- FR-ED-015 (Should): The system should provide an always-visible status bar exposing active vault, active mode, and runtime execution state.
+  Acceptance: The status bar can show active context at all times and update after commands or mode changes.
+
+- FR-ED-016 (Should): The system should support per-command keybinding customization with durable persistence.
+  Acceptance: A user can update a command hotkey and keep it across restarts.
+
+- FR-ED-017 (Should): The system should provide dedicated outgoing-links and backlinks inspector panels for the active note or object.
+  Acceptance: Linked-context relationships are inspectable without leaving the active workspace view.
+
+- FR-ED-018 (Should): The system should support recent-files and navigation-history jumps in the workspace.
+  Acceptance: A user can quickly return to recently opened files or step through note navigation history.
 
 ### 9.4 Context Objects and Relationships
 
@@ -341,6 +371,9 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 - FR-SR-010 (Should): The system should support project startup and operating templates that create recommended views, dossiers, and object scaffolds for common workflows.
   Acceptance: A user can initialize a project context from a template without forcing a specific folder hierarchy.
 
+- FR-SR-011 (Should): The system should support interactive global and local graph views for notes, objects, and relationships.
+  Acceptance: A user can pivot from one node into its local neighborhood and open linked artifacts directly.
+
 ### 9.10 Knowledge Graph and Structured Context
 
 - FR-KG-001 (Must): The system shall construct a graph from wikilinks, embeds, tags, references, and typed object relationships.
@@ -479,6 +512,18 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 - FR-IE-007 (Must): The system shall expose a deterministic command-line interface for core workspace automation.
   Acceptance: Notes, objects, views, and agent-safe operations can be created or queried through CLI commands with stable outputs.
 
+- FR-IE-008 (Should): The system should provide a core-plugin host with lifecycle hooks and bounded capability scopes.
+  Acceptance: Built-in modules can register startup, shutdown, command, and view hooks through a stable internal contract.
+
+- FR-IE-009 (Should): The system should allow plugins to register command IDs into the global command bus.
+  Acceptance: Plugin-registered commands are discoverable in the command palette and enforce declared scope boundaries.
+
+- FR-IE-010 (Should): The system should support user-controlled theme packages and CSS snippet overlays in workspace configuration.
+  Acceptance: A user can enable or disable theme/snippet overrides without modifying canonical evidence files.
+
+- FR-IE-011 (Should): The system should support startup safe mode that loads only core plugins and disables third-party extensions.
+  Acceptance: A user can relaunch in safe mode to recover from plugin-caused instability.
+
 ### 9.16 Security, Permissions, and Privacy
 
 - FR-SP-001 (Must): The system shall require explicit user approval for destructive or external side-effecting agent actions.
@@ -504,6 +549,9 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 
 - FR-SP-008 (Should): The system should support encrypted local secret storage.
   Acceptance: Credentials are stored outside plain-text evidence files.
+
+- FR-SP-009 (Should): The system should verify signed release artifacts and update payload integrity before applying updates.
+  Acceptance: The updater refuses unsigned or hash-mismatched payloads and records a diagnostic event.
 
 ### 9.17 Observability and Evaluation
 
@@ -535,6 +583,7 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 - NFR-015 Cross-platform support: The architecture shall support macOS, Windows, and Linux even if release sequencing starts with macOS.
 - NFR-016 Artifact validity: Supported native artifact formats shall be schema-validated before durable writes are committed.
 - NFR-017 Maintenance safety: Automated stewardship and bulk refactors shall default to previewable, bounded, and reversible behavior where technically feasible.
+- NFR-018 Command latency: Command palette open and command dispatch feedback shall occur in under 100 ms for the 95th percentile on a warmed desktop session.
 
 ## 11. External Interface Requirements
 

@@ -1,6 +1,6 @@
 # SRS Execution Matrix
 
-Generated from `docs/SRS.md` at `2026-03-24T04:06:05Z`.
+Generated from `docs/SRS.md` at `2026-03-24T05:59:01Z`.
 
 Legend:
 - `todo`: not started
@@ -10,30 +10,40 @@ Legend:
 
 | Requirement | Priority | Milestone | Status | Summary |
 | --- | --- | --- | --- | --- |
-| `FR-WV-001` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall allow the user to create, open, close, and switch between vaults. |
-| `FR-WV-002` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall treat Markdown files and asset folders as the primary user-owned authored evidence store. |
-| `FR-WV-003` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall store app-specific indexes, caches, and metadata separately from authored evidence files. |
-| `FR-WV-004` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall detect file additions, deletions, renames, and edits made outside the app. |
-| `FR-WV-005` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall maintain internal stable identifiers independent of file path changes. |
+| `FR-WV-001` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall allow the user to create, open, close, and switch between vaults. |
+| `FR-WV-002` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall treat Markdown files and asset folders as the primary user-owned authored evidence store. |
+| `FR-WV-003` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall store app-specific indexes, caches, and metadata separately from authored evidence files. |
+| `FR-WV-004` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall detect file additions, deletions, renames, and edits made outside the app. |
+| `FR-WV-005` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall maintain internal stable identifiers independent of file path changes. |
 | `FR-WV-006` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support multiple root folders or mounted collections inside one workspace. |
 | `FR-WV-007` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support encrypted app secrets and provider credentials. |
-| `FR-CI-001` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support instant creation of a new note from keyboard-driven flows. |
-| `FR-CI-002` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support append flows to inbox notes, daily notes, and selected notes. |
+| `FR-WV-008` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support deep-link protocol actions using `thoughtforge://` URIs for opening vaults, notes, and agent-safe actions. |
+| `FR-WV-009` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should restore the previous workspace session including active vault, open tabs, and layout state on startup. |
+| `FR-CI-001` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall support instant creation of a new note from keyboard-driven flows. |
+| `FR-CI-002` | `Must` | M1 - Vault and Capture Foundation | `in_progress` | The system shall support append flows to inbox notes, daily notes, and selected notes. |
 | `FR-CI-003` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support drag-and-drop or picker-based attachment import. |
 | `FR-CI-004` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support clipboard web clipping with source URL and capture timestamp. |
 | `FR-CI-005` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support voice memo or speech-to-note capture through pluggable transcription providers. |
 | `FR-CI-006` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support ingestion pipelines for PDFs, web pages, code files, transcripts, and meeting recordings. |
+| `FR-CI-007` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support configurable daily-note capture and append flows. |
 | `FR-ED-001` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall provide a rich Markdown-native editor. |
-| `FR-ED-002` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support wikilinks and automatic backlink tracking. |
+| `FR-ED-002` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall support wikilinks and automatic backlink tracking. |
 | `FR-ED-003` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support tags, frontmatter, and inline metadata fields. |
 | `FR-ED-004` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support block references and embeds. |
 | `FR-ED-005` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support undo, redo, autosave, and crash-safe recovery. |
 | `FR-ED-006` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support slash commands and command palette insertion flows. |
-| `FR-ED-007` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support split panes, tabs, and pinned views. |
+| `FR-ED-007` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support split panes, tabs, and pinned views. |
 | `FR-ED-008` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support custom typed blocks such as callouts, evidence excerpts, tasks, decisions, commitments, and constraints. |
 | `FR-ED-009` | `Could` | M1 - Vault and Capture Foundation | `todo` | The system could support WYSIWYG and source modes with shared document state. |
 | `FR-ED-010` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support visual workspace documents stored in an open, serializable format. |
 | `FR-ED-011` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support schema-validated native artifact generation for supported workspace formats. |
+| `FR-ED-012` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall provide a global command palette with stable command identifiers for workspace and agent actions. |
+| `FR-ED-013` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should provide a quick switcher for low-latency note and object navigation. |
+| `FR-ED-014` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should provide a persistent workspace layout manager supporting tabs, pinning, and split panes. |
+| `FR-ED-015` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should provide an always-visible status bar exposing active vault, active mode, and runtime execution state. |
+| `FR-ED-016` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support per-command keybinding customization with durable persistence. |
+| `FR-ED-017` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should provide dedicated outgoing-links and backlinks inspector panels for the active note or object. |
+| `FR-ED-018` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support recent-files and navigation-history jumps in the workspace. |
 | `FR-CX-001` | `Must` | M2 - Context and Memory Model | `todo` | The system shall support first-class context objects for `Intent`, `Project`, `Task`, `Decision`, `Commitment`, `Assumption`, `OpenQuestion`, `Entity`, `Resource`, `Constraint`, `Conversation`, `Delegation`, `Approval`, and `StateDelta`. |
 | `FR-CX-002` | `Must` | M2 - Context and Memory Model | `todo` | The system shall assign stable internal identifiers to all context objects. |
 | `FR-CX-003` | `Must` | M2 - Context and Memory Model | `todo` | The system shall support explicit relationships between context objects and evidence items. |
@@ -72,7 +82,7 @@ Legend:
 | `FR-CC-007` | `Should` | M3 - Daemon and Context Compiler | `todo` | The system should support handoff bundles for transferring project context between users, sessions, or agents. |
 | `FR-SR-001` | `Must` | M4 - Retrieval and Knowledge Graph | `todo` | The system shall support full-text search across evidence titles, bodies, tags, and metadata. |
 | `FR-SR-002` | `Must` | M4 - Retrieval and Knowledge Graph | `todo` | The system shall support phrase, prefix, boolean, and scoped search. |
-| `FR-SR-003` | `Must` | M4 - Retrieval and Knowledge Graph | `todo` | The system shall support linked-context navigation. |
+| `FR-SR-003` | `Must` | M4 - Retrieval and Knowledge Graph | `done` | The system shall support linked-context navigation. |
 | `FR-SR-004` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support semantic search over indexed chunks. |
 | `FR-SR-005` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support saved searches, smart collections, and dynamic views. |
 | `FR-SR-006` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support resurfacing features such as related notes, stale commitments, decision follow-ups, and today in memory. |
@@ -80,6 +90,7 @@ Legend:
 | `FR-SR-008` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support structured view definitions for filters, grouping, formulas, and dashboards over evidence and context objects. |
 | `FR-SR-009` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should surface maintenance-oriented queues and views for stale, uncategorized, orphaned, duplicate, or review-needed workspace state. |
 | `FR-SR-010` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support project startup and operating templates that create recommended views, dossiers, and object scaffolds for common workflows. |
+| `FR-SR-011` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support interactive global and local graph views for notes, objects, and relationships. |
 | `FR-KG-001` | `Must` | M4 - Retrieval and Knowledge Graph | `todo` | The system shall construct a graph from wikilinks, embeds, tags, references, and typed object relationships. |
 | `FR-KG-002` | `Must` | M4 - Retrieval and Knowledge Graph | `todo` | The system shall maintain extracted entities, aliases, and relationships as a projection layer. |
 | `FR-KG-003` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support user-defined entity types such as person, project, idea, task, system, and goal. |
@@ -122,6 +133,10 @@ Legend:
 | `FR-IE-005` | `Should` | M8 - Interop and CLI | `todo` | The system should support open-in-default-app and open-with-external-editor flows. |
 | `FR-IE-006` | `Should` | M8 - Interop and CLI | `todo` | The system should support import and export of open visual workspace artifacts and structured view definitions. |
 | `FR-IE-007` | `Must` | M8 - Interop and CLI | `done` | The system shall expose a deterministic command-line interface for core workspace automation. |
+| `FR-IE-008` | `Should` | M8 - Interop and CLI | `done` | The system should provide a core-plugin host with lifecycle hooks and bounded capability scopes. |
+| `FR-IE-009` | `Should` | M8 - Interop and CLI | `done` | The system should allow plugins to register command IDs into the global command bus. |
+| `FR-IE-010` | `Should` | M8 - Interop and CLI | `todo` | The system should support user-controlled theme packages and CSS snippet overlays in workspace configuration. |
+| `FR-IE-011` | `Should` | M8 - Interop and CLI | `todo` | The system should support startup safe mode that loads only core plugins and disables third-party extensions. |
 | `FR-SP-001` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall require explicit user approval for destructive or external side-effecting agent actions. |
 | `FR-SP-002` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall separate trusted core code from less-trusted frontend and plugin execution contexts. |
 | `FR-SP-003` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall support provider-level data sharing controls. |
@@ -130,6 +145,7 @@ Legend:
 | `FR-SP-006` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall expose what the context daemon observes and allow per-source controls. |
 | `FR-SP-007` | `Should` | M9 - Trust, Safety, and Evaluation | `todo` | The system should support redaction rules and no-send folders. |
 | `FR-SP-008` | `Should` | M9 - Trust, Safety, and Evaluation | `todo` | The system should support encrypted local secret storage. |
+| `FR-SP-009` | `Should` | M9 - Trust, Safety, and Evaluation | `todo` | The system should verify signed release artifacts and update payload integrity before applying updates. |
 | `FR-OE-001` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall log user-visible agent actions, approvals, denials, memory promotions, daemon reconciliations, and failures. |
 | `FR-OE-002` | `Should` | M9 - Trust, Safety, and Evaluation | `todo` | The system should support local evaluation harnesses for retrieval quality, context compilation quality, delegation safety, and task completion quality. |
 | `FR-OE-003` | `Should` | M9 - Trust, Safety, and Evaluation | `todo` | The system should support optional anonymous telemetry with explicit opt-in. |
@@ -150,3 +166,4 @@ Legend:
 | `NFR-015` | `Quality` | QG - Quality Gates | `todo` | Cross-platform support: The architecture shall support macOS, Windows, and Linux even if release sequencing starts with macOS. |
 | `NFR-016` | `Quality` | QG - Quality Gates | `todo` | Artifact validity: Supported native artifact formats shall be schema-validated before durable writes are committed. |
 | `NFR-017` | `Quality` | QG - Quality Gates | `todo` | Maintenance safety: Automated stewardship and bulk refactors shall default to previewable, bounded, and reversible behavior where technically feasible. |
+| `NFR-018` | `Quality` | QG - Quality Gates | `todo` | Command latency: Command palette open and command dispatch feedback shall occur in under 100 ms for the 95th percentile on a warmed desktop session. |
