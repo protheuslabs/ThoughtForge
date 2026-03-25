@@ -259,6 +259,13 @@
   background: var(--surface-elevated);
 }
 
+.tabbar.is-drop-end::after {
+  content: '';
+  width: 3px;
+  align-self: stretch;
+  background: color-mix(in srgb, var(--accent) 72%, transparent);
+}
+
 .pane-tab-actions {
   margin-left: auto;
   display: inline-flex;
@@ -299,6 +306,29 @@
   display: inline-flex;
   align-items: center;
   border-right: 1px solid var(--edge);
+  position: relative;
+}
+
+.tab.is-drop-before::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  width: 3px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 72%, transparent);
+}
+
+.tab.is-drop-after::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 0.2rem;
+  bottom: 0.2rem;
+  width: 3px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 72%, transparent);
 }
 
 .tab button {

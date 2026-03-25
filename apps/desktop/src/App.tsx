@@ -69,6 +69,11 @@ type EditorPane = {
   activeNoteId: string
 }
 
+type TabDropTarget = {
+  paneId: string
+  index: number
+}
+
 type DesktopVaultSummary = {
   id: string
   name: string
@@ -844,6 +849,10 @@ function App() {
   const [activePaneId, setActivePaneId] = useState<string>(MAIN_EDITOR_PANE_ID)
   const [paneSplitRatio, setPaneSplitRatio] = useState<number>(0.55)
   const [paneResizeActive, setPaneResizeActive] = useState<boolean>(false)
+  const [draggingTab, setDraggingTab] = useState<{ noteId: string; fromPaneId: string } | null>(
+    null,
+  )
+  const [tabDropTarget, setTabDropTarget] = useState<TabDropTarget | null>(null)
   const [pinnedTabs, setPinnedTabs] = useState<string[]>(bootLayout?.pinnedTabs ?? [])
   const [recentNotes, setRecentNotes] = useState<string[]>(bootLayout?.recentNotes ?? [])
   const [historyBack, setHistoryBack] = useState<string[]>(bootLayout?.historyBack ?? [])
@@ -1130,6 +1139,55 @@ function App() {
       .filter((pane) => pane.tabIds.length > 0)
     commitPaneLayout(nextPanes, toPane.id)
     setStatusLine('Moved tab to adjacent pane')
+  }
+
+  function moveTabByDrop(
+    noteId: string,
+    fromPaneId: string,
+    toPaneId: string,
+    targetIndex: number,
+  ): void {
+    const sourcePane = editorPanes.find((pane) => pane.id === fromPaneId)
+    const destinationPane = editorPanes.find((pane) => pane.id === toPaneId)
+    if (!sourcePane || !destinationPane) {
+      return
+    }
+    const sourceIndex = sourcePane.tabIds.indexOf(noteId)
+    if (sourceIndex === -1) {
+      return
+    }
+
+    const nextPanes = editorPanes.map((pane) => ({
+      ...pane,
+      tabIds: [...pane.tabIds],
+    }))
+    const source = nextPanes.find((pane) => pane.id === fromPaneId)
+    const destination = nextPanes.find((pane) => pane.id === toPaneId)
+    if (!source || !destination) {
+      return
+    }
+
+    source.tabIds.splice(sourceIndex, 1)
+    let insertionIndex = Math.max(0, Math.min(targetIndex, destination.tabIds.length))
+    if (source.id === destination.id && sourceIndex < insertionIndex) {
+      insertionIndex -= 1
+    }
+    const destinationHasNote = destination.tabIds.includes(noteId)
+    if (!destinationHasNote) {
+      destination.tabIds.splice(insertionIndex, 0, noteId)
+    }
+
+    if (source.activeNoteId === noteId) {
+      source.activeNoteId = source.tabIds[0] ?? ''
+    }
+    destination.activeNoteId = noteId
+
+    const cleanedPanes =
+      source.id !== destination.id && source.tabIds.length === 0 && nextPanes.length > 1
+        ? nextPanes.filter((pane) => pane.id !== source.id)
+        : nextPanes
+    commitPaneLayout(cleanedPanes, destination.id)
+    setStatusLine(source.id === destination.id ? 'Reordered tab' : 'Moved tab between panes')
   }
 
   function upsertNote(note: VaultNote, shouldOpen = false): void {
@@ -2039,16 +2097,97 @@ function App() {
         className={isFocused ? 'editor-pane is-focused' : 'editor-pane'}
         onMouseDown={() => focusPane(pane.id)}
       >
-        <div className="tabbar">
-          {pane.tabIds.map((tabId) => {
+        <div
+          className={
+            tabDropTarget?.paneId === pane.id && tabDropTarget.index === pane.tabIds.length
+              ? 'tabbar is-drop-end'
+              : 'tabbar'
+          }
+          onDragOver={(event) => {
+            if (!draggingTab) {
+              return
+            }
+            event.preventDefault()
+            setTabDropTarget({ paneId: pane.id, index: pane.tabIds.length })
+          }}
+          onDrop={(event) => {
+            if (!draggingTab) {
+              return
+            }
+            event.preventDefault()
+            moveTabByDrop(
+              draggingTab.noteId,
+              draggingTab.fromPaneId,
+              pane.id,
+              pane.tabIds.length,
+            )
+            setDraggingTab(null)
+            setTabDropTarget(null)
+          }}
+        >
+          {pane.tabIds.map((tabId, tabIndex) => {
             const note = notesById.get(tabId)
             if (!note) {
               return null
             }
             const pinned = pinnedTabs.includes(tabId)
             const isTabActive = paneActiveNote ? paneActiveNote.id === tabId : false
+            const showDropBefore =
+              tabDropTarget?.paneId === pane.id && tabDropTarget.index === tabIndex
+            const showDropAfter =
+              tabDropTarget?.paneId === pane.id && tabDropTarget.index === tabIndex + 1
             return (
-              <div key={tabId} className={isTabActive ? 'tab is-active' : 'tab'}>
+              <div
+                key={tabId}
+                className={[
+                  isTabActive ? 'tab is-active' : 'tab',
+                  showDropBefore ? 'is-drop-before' : '',
+                  showDropAfter ? 'is-drop-after' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('text/plain', tabId)
+                  setDraggingTab({ noteId: tabId, fromPaneId: pane.id })
+                  setTabDropTarget(null)
+                }}
+                onDragEnd={() => {
+                  setDraggingTab(null)
+                  setTabDropTarget(null)
+                }}
+                onDragOver={(event) => {
+                  if (!draggingTab) {
+                    return
+                  }
+                  event.preventDefault()
+                  event.stopPropagation()
+                  const bounds = event.currentTarget.getBoundingClientRect()
+                  const before = event.clientX < bounds.left + bounds.width / 2
+                  setTabDropTarget({
+                    paneId: pane.id,
+                    index: before ? tabIndex : tabIndex + 1,
+                  })
+                }}
+                onDrop={(event) => {
+                  if (!draggingTab) {
+                    return
+                  }
+                  event.preventDefault()
+                  event.stopPropagation()
+                  const bounds = event.currentTarget.getBoundingClientRect()
+                  const before = event.clientX < bounds.left + bounds.width / 2
+                  moveTabByDrop(
+                    draggingTab.noteId,
+                    draggingTab.fromPaneId,
+                    pane.id,
+                    before ? tabIndex : tabIndex + 1,
+                  )
+                  setDraggingTab(null)
+                  setTabDropTarget(null)
+                }}
+              >
                 <button type="button" onClick={() => openNote(tabId, note.title, true, pane.id)}>
                   {note.title}
                 </button>
