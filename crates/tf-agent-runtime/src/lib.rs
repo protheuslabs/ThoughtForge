@@ -18,6 +18,34 @@ pub fn builtin_workspace_commands() -> Vec<WorkspaceCommand> {
             scope: CommandScope::Workspace,
         },
         WorkspaceCommand {
+            id: "vaults:open-modal".to_string(),
+            name: "Open vault manager".to_string(),
+            description: "Open or switch local vault roots through desktop runtime.".to_string(),
+            hotkeys: vec!["Mod+Shift+V".to_string()],
+            scope: CommandScope::Workspace,
+        },
+        WorkspaceCommand {
+            id: "vaults:bootstrap-refresh".to_string(),
+            name: "Refresh desktop workspace".to_string(),
+            description: "Reload desktop vault index and workspace registry state.".to_string(),
+            hotkeys: vec!["Mod+Shift+B".to_string()],
+            scope: CommandScope::Workspace,
+        },
+        WorkspaceCommand {
+            id: "graph:open-view".to_string(),
+            name: "Open graph view".to_string(),
+            description: "Open relationship graph between notes in active vault.".to_string(),
+            hotkeys: vec!["Mod+G".to_string()],
+            scope: CommandScope::Workspace,
+        },
+        WorkspaceCommand {
+            id: "settings:open".to_string(),
+            name: "Open settings".to_string(),
+            description: "Open workspace settings surface.".to_string(),
+            hotkeys: vec!["Mod+,".to_string()],
+            scope: CommandScope::App,
+        },
+        WorkspaceCommand {
             id: "file-explorer:new-file".to_string(),
             name: "Create new note".to_string(),
             description: "Create a note in the active vault".to_string(),
@@ -62,8 +90,8 @@ pub fn builtin_workspace_commands() -> Vec<WorkspaceCommand> {
         },
         WorkspaceCommand {
             id: "workspace:split-vertical".to_string(),
-            name: "Split editor vertically".to_string(),
-            description: "Open split view for source and preview panes".to_string(),
+            name: "Split active pane right".to_string(),
+            description: "Create adjacent pane with independent tab stack".to_string(),
             hotkeys: vec!["Mod+\\".to_string()],
             scope: CommandScope::Editor,
         },
@@ -120,9 +148,12 @@ pub fn builtin_core_plugins() -> Vec<CorePluginSpec> {
             command_ids: vec![
                 "file-explorer:new-file".to_string(),
                 "switcher:open".to_string(),
+                "vaults:open-modal".to_string(),
+                "vaults:bootstrap-refresh".to_string(),
                 "daily-note:open-today".to_string(),
                 "capture:append-inbox".to_string(),
                 "capture:append-daily".to_string(),
+                "graph:open-view".to_string(),
             ],
             capability_scopes: vec![CommandScope::Workspace, CommandScope::App],
         },
@@ -159,6 +190,7 @@ pub fn builtin_core_plugins() -> Vec<CorePluginSpec> {
                 "command-palette:open".to_string(),
                 "app:toggle-left-sidebar".to_string(),
                 "app:toggle-right-sidebar".to_string(),
+                "settings:open".to_string(),
             ],
             capability_scopes: vec![CommandScope::App, CommandScope::Workspace],
         },
@@ -235,6 +267,8 @@ mod tests {
                 .any(|command| command.id == "command-palette:open")
         );
         assert!(commands.iter().any(|command| command.id == "switcher:open"));
+        assert!(commands.iter().any(|command| command.id == "graph:open-view"));
+        assert!(commands.iter().any(|command| command.id == "settings:open"));
     }
 
     #[test]
@@ -249,5 +283,7 @@ mod tests {
                 .iter()
                 .any(|id| id == "workspace:split-vertical")
         );
+        assert!(command_ids.iter().any(|id| id == "graph:open-view"));
+        assert!(command_ids.iter().any(|id| id == "settings:open"));
     }
 }

@@ -141,6 +141,8 @@ docs/
 ```bash
 npm run desktop:install
 npm run desktop:dev
+npm --prefix apps/desktop run tauri:dev
+npm --prefix apps/desktop run tauri:build
 npm run srs:matrix
 npm run srs:verify-full
 npm run cli -- srs-status --matrix docs/SRS_EXECUTION_MATRIX.md

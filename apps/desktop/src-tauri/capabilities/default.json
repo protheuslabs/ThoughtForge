@@ -1,0 +1,8 @@
+{
+  "identifier": "default",
+  "description": "Default desktop capability set for Thoughtforge.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

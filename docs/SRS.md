@@ -142,6 +142,12 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 - FR-WV-009 (Should): The system should restore the previous workspace session including active vault, open tabs, and layout state on startup.
   Acceptance: Restarting the app can reopen the prior session context without manual reconstruction.
 
+- FR-WV-010 (Must): The desktop runtime shall support opening and switching local vaults through a native command bridge.
+  Acceptance: A user can open a vault path, register it, and switch active vaults without restarting the app.
+
+- FR-WV-011 (Must): The desktop runtime shall persist note creation, note edits, and capture appends directly to vault files.
+  Acceptance: Editing or capturing in the desktop UI writes durable changes to the corresponding Markdown files on disk.
+
 ### 9.2 Capture and Ingestion
 
 - FR-CI-001 (Must): The system shall support instant creation of a new note from keyboard-driven flows.
@@ -523,6 +529,9 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 
 - FR-IE-011 (Should): The system should support startup safe mode that loads only core plugins and disables third-party extensions.
   Acceptance: A user can relaunch in safe mode to recover from plugin-caused instability.
+
+- FR-IE-012 (Should): The desktop app should expose typed invoke commands for bootstrap, vault lifecycle, note lifecycle, and capture flows.
+  Acceptance: The desktop UI can call stable runtime commands to load workspace state and execute file-safe operations.
 
 ### 9.16 Security, Permissions, and Privacy
 

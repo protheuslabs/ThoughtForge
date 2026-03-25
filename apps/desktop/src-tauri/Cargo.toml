@@ -3,7 +3,13 @@ name = "thoughtforge-desktop"
 version = "0.1.0"
 edition = "2024"
 
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
 [dependencies]
+dirs = "6"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "2", features = [] }
 tf-agent-runtime = { path = "../../../crates/tf-agent-runtime" }
 tf-context-compiler = { path = "../../../crates/tf-context-compiler" }
 tf-context-daemon = { path = "../../../crates/tf-context-daemon" }

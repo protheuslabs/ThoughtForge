@@ -1,4 +1,5 @@
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import './App.css'
 
 type EditorMode = 'source' | 'preview' | 'split'
@@ -53,6 +54,62 @@ type SlashState = {
   query: string
   replaceStart: number
   replaceEnd: number
+}
+
+type RibbonAction = {
+  id: string
+  label: string
+  glyph: string
+  description: string
+}
+
+type EditorPane = {
+  id: string
+  tabIds: string[]
+  activeNoteId: string
+}
+
+type DesktopVaultSummary = {
+  id: string
+  name: string
+  rootPath: string
+  lastOpenedAt: number
+  isActive: boolean
+}
+
+type DesktopNoteSnapshot = {
+  id: string
+  path: string
+  title: string
+  tags: string[]
+  links: string[]
+  content: string
+  updatedAt?: number
+}
+
+type DesktopVaultSnapshot = {
+  id: string
+  name: string
+  rootPath: string
+  notes: DesktopNoteSnapshot[]
+}
+
+type DesktopWorkspaceState = {
+  isMacos: boolean
+  registryPath: string
+  activeVaultId: string | null
+  vaults: DesktopVaultSummary[]
+  activeVault: DesktopVaultSnapshot | null
+}
+
+type DesktopCaptureResponse = {
+  result: {
+    target: 'inbox' | 'daily' | 'selected_note'
+    note_path: string
+    created_note: boolean
+    appended_text: string
+  }
+  note: DesktopNoteSnapshot
 }
 
 const INITIAL_NOTES: VaultNote[] = [
@@ -155,6 +212,7 @@ Linked from [[Project Dossier]] and [[Agent Context Model]].`,
 const LAYOUT_STORAGE_KEY = 'thoughtforge.workspace.layout.v1'
 const COMMAND_BINDINGS_KEY = 'thoughtforge.command.bindings.v1'
 const DAILY_NOTE_CONFIG_KEY = 'thoughtforge.capture.daily.v1'
+const MAIN_EDITOR_PANE_ID = 'pane-main'
 
 const DEFAULT_DAILY_NOTE_CONFIG: DailyNoteConfig = {
   folder: '00 Daily',
@@ -197,6 +255,72 @@ const SLASH_COMMANDS: SlashCommand[] = [
     description: 'Insert a stable block anchor marker',
     keywords: ['block', 'anchor', 'reference'],
     insert: (now) => ` ^block-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`,
+  },
+]
+
+const RIBBON_PRIMARY_ACTIONS: RibbonAction[] = [
+  {
+    id: 'app:toggle-left-sidebar',
+    label: 'Files',
+    glyph: 'F',
+    description: 'Toggle file explorer',
+  },
+  {
+    id: 'switcher:open',
+    label: 'Search',
+    glyph: 'S',
+    description: 'Open quick switcher',
+  },
+  {
+    id: 'graph:open-view',
+    label: 'Graph',
+    glyph: 'G',
+    description: 'Open relationship graph',
+  },
+  {
+    id: 'command-palette:open',
+    label: 'Commands',
+    glyph: 'C',
+    description: 'Open command palette',
+  },
+  {
+    id: 'vaults:open-modal',
+    label: 'Vaults',
+    glyph: 'V',
+    description: 'Open vault manager',
+  },
+]
+
+const RIBBON_SECONDARY_ACTIONS: RibbonAction[] = [
+  {
+    id: 'capture:append-inbox',
+    label: 'Capture',
+    glyph: 'I',
+    description: 'Capture to inbox',
+  },
+  {
+    id: 'daily-note:open-today',
+    label: 'Daily',
+    glyph: 'D',
+    description: 'Open daily note',
+  },
+  {
+    id: 'app:toggle-right-sidebar',
+    label: 'Inspector',
+    glyph: 'R',
+    description: 'Toggle right sidebar',
+  },
+  {
+    id: 'theme:toggle-light-dark',
+    label: 'Theme',
+    glyph: 'T',
+    description: 'Toggle theme',
+  },
+  {
+    id: 'settings:open',
+    label: 'Settings',
+    glyph: 'P',
+    description: 'Open workspace settings',
   },
 ]
 
@@ -282,6 +406,32 @@ function saveDailyNoteConfig(config: DailyNoteConfig): void {
     window.localStorage.setItem(DAILY_NOTE_CONFIG_KEY, JSON.stringify(config))
   } catch {
     // no-op: best effort persistence
+  }
+}
+
+function hasTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+function formatEpochSeconds(epochSeconds?: number): string {
+  if (!epochSeconds) {
+    return formatNow()
+  }
+  const date = new Date(epochSeconds * 1000)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`
+}
+
+function fromDesktopNote(snapshot: DesktopNoteSnapshot): VaultNote {
+  return {
+    id: snapshot.id,
+    path: snapshot.path,
+    title: snapshot.title,
+    content: snapshot.content,
+    tags: snapshot.tags,
+    updatedAt: formatEpochSeconds(snapshot.updatedAt),
   }
 }
 
@@ -676,10 +826,24 @@ function App() {
   const bootOpenTabs =
     bootLayout?.openTabs?.filter((tabId) => bootNotes.some((note) => note.id === tabId)) ?? []
   const resolvedOpenTabs = bootOpenTabs.length > 0 ? bootOpenTabs : [bootActiveNoteId]
+  const initialPaneTabs = resolvedOpenTabs.filter((tabId) => tabId !== '')
+  const initialPaneActive = initialPaneTabs.includes(bootActiveNoteId)
+    ? bootActiveNoteId
+    : (initialPaneTabs[0] ?? '')
 
   const [notes, setNotes] = useState<VaultNote[]>(bootNotes)
-  const [activeNoteId, setActiveNoteId] = useState<string>(bootActiveNoteId)
-  const [openTabs, setOpenTabs] = useState<string[]>(resolvedOpenTabs)
+  const [activeNoteId, setActiveNoteId] = useState<string>(initialPaneActive)
+  const [openTabs, setOpenTabs] = useState<string[]>(initialPaneTabs)
+  const [editorPanes, setEditorPanes] = useState<EditorPane[]>([
+    {
+      id: MAIN_EDITOR_PANE_ID,
+      tabIds: initialPaneTabs,
+      activeNoteId: initialPaneActive,
+    },
+  ])
+  const [activePaneId, setActivePaneId] = useState<string>(MAIN_EDITOR_PANE_ID)
+  const [paneSplitRatio, setPaneSplitRatio] = useState<number>(0.55)
+  const [paneResizeActive, setPaneResizeActive] = useState<boolean>(false)
   const [pinnedTabs, setPinnedTabs] = useState<string[]>(bootLayout?.pinnedTabs ?? [])
   const [recentNotes, setRecentNotes] = useState<string[]>(bootLayout?.recentNotes ?? [])
   const [historyBack, setHistoryBack] = useState<string[]>(bootLayout?.historyBack ?? [])
@@ -697,8 +861,20 @@ function App() {
   const [commandQuery, setCommandQuery] = useState<string>('')
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState<boolean>(false)
   const [quickSwitcherQuery, setQuickSwitcherQuery] = useState<string>('')
+  const [graphOpen, setGraphOpen] = useState<boolean>(false)
+  const [settingsOpen, setSettingsOpen] = useState<boolean>(false)
   const [statusLine, setStatusLine] = useState<string>('Ready')
   const [commandHistory, setCommandHistory] = useState<string[]>(bootLayout?.commandHistory ?? [])
+  const [isNativeDesktop] = useState<boolean>(() => hasTauriRuntime())
+  const [isMacDesktop, setIsMacDesktop] = useState<boolean>(false)
+  const [registryPath, setRegistryPath] = useState<string>('')
+  const [activeVaultRoot, setActiveVaultRoot] = useState<string | null>(null)
+  const [activeVaultName, setActiveVaultName] = useState<string>('Thoughtforge Core')
+  const [knownVaults, setKnownVaults] = useState<DesktopVaultSummary[]>([])
+  const [vaultModalOpen, setVaultModalOpen] = useState<boolean>(false)
+  const [vaultPathInput, setVaultPathInput] = useState<string>('')
+  const [vaultNameInput, setVaultNameInput] = useState<string>('')
+  const [vaultActionBusy, setVaultActionBusy] = useState<boolean>(false)
   const [dailyNoteConfig, setDailyNoteConfig] = useState<DailyNoteConfig>(() =>
     loadDailyNoteConfig(),
   )
@@ -712,6 +888,8 @@ function App() {
     replaceEnd: 0,
   })
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
+  const paneDockRef = useRef<HTMLDivElement | null>(null)
+  const pendingSaves = useRef<Record<string, number>>({})
 
   const deferredExplorerQuery = useDeferredValue(explorerQuery)
   const deferredCommandQuery = useDeferredValue(commandQuery)
@@ -735,6 +913,54 @@ function App() {
     const links = extractLinks(note.content)
     return links.some((value) => activeAliases.includes(value))
   })
+
+  const aliasToNoteId = notes.reduce<Record<string, string>>((acc, note) => {
+    for (const alias of noteAliases(note)) {
+      acc[alias] = note.id
+    }
+    return acc
+  }, {})
+
+  const graphEdges = notes.flatMap((note) =>
+    extractLinks(note.content)
+      .map((target) => {
+        const targetId = aliasToNoteId[target]
+        if (!targetId) {
+          return null
+        }
+        return { sourceId: note.id, targetId }
+      })
+      .filter((edge): edge is { sourceId: string; targetId: string } => edge !== null),
+  )
+  const graphMetricsByNote = notes.reduce<
+    Record<string, { incoming: number; outgoing: number }>
+  >((acc, note) => {
+    acc[note.id] = { incoming: 0, outgoing: 0 }
+    return acc
+  }, {})
+  for (const edge of graphEdges) {
+    if (graphMetricsByNote[edge.sourceId]) {
+      graphMetricsByNote[edge.sourceId].outgoing += 1
+    }
+    if (graphMetricsByNote[edge.targetId]) {
+      graphMetricsByNote[edge.targetId].incoming += 1
+    }
+  }
+  const activeGraphNeighbors = activeNote
+    ? [...new Set(
+        graphEdges.flatMap((edge) => {
+          if (edge.sourceId === activeNote.id) {
+            return [edge.targetId]
+          }
+          if (edge.targetId === activeNote.id) {
+            return [edge.sourceId]
+          }
+          return []
+        }),
+      )]
+        .map((noteId) => notesById.get(noteId))
+        .filter((note): note is VaultNote => Boolean(note))
+    : []
 
   const explorerItems = notes.filter((note) => {
     if (deferredExplorerQuery.trim() === '') {
@@ -764,14 +990,298 @@ function App() {
     )
   })
 
-  function openNote(noteId: string, source: string, trackHistory = true): void {
+  function commitPaneLayout(nextPanes: EditorPane[], nextActivePaneId?: string): void {
+    const fallbackNoteId = notes[0]?.id ?? ''
+    const normalizedPanes = (
+      nextPanes.length > 0
+        ? nextPanes
+        : [
+            {
+              id: MAIN_EDITOR_PANE_ID,
+              tabIds: fallbackNoteId ? [fallbackNoteId] : [],
+              activeNoteId: fallbackNoteId,
+            },
+          ]
+    ).map((pane, index) => {
+      const dedupTabs = [...new Set(pane.tabIds)].filter((tabId) => tabId !== '')
+      const tabIds = dedupTabs.length > 0 ? dedupTabs : (fallbackNoteId ? [fallbackNoteId] : [])
+      const active = tabIds.includes(pane.activeNoteId) ? pane.activeNoteId : (tabIds[0] ?? '')
+      return {
+        id: pane.id || `pane-${index + 1}`,
+        tabIds,
+        activeNoteId: active,
+      }
+    })
+    const focusedPane =
+      normalizedPanes.find((pane) => pane.id === nextActivePaneId) ?? normalizedPanes[0]
+    if (!focusedPane) {
+      setEditorPanes(normalizedPanes)
+      setActivePaneId(MAIN_EDITOR_PANE_ID)
+      setOpenTabs([])
+      setActiveNoteId('')
+      return
+    }
+    setEditorPanes(normalizedPanes)
+    setActivePaneId(focusedPane.id)
+    setOpenTabs(focusedPane.tabIds)
+    setActiveNoteId(focusedPane.activeNoteId)
+  }
+
+  function focusPane(paneId: string): void {
+    const pane = editorPanes.find((item) => item.id === paneId)
+    if (!pane) {
+      return
+    }
+    const active = pane.tabIds.includes(pane.activeNoteId) ? pane.activeNoteId : (pane.tabIds[0] ?? '')
+    setActivePaneId(pane.id)
+    setOpenTabs(pane.tabIds)
+    setActiveNoteId(active)
+  }
+
+  function splitActivePane(): void {
+    if (editorPanes.length >= 2) {
+      setStatusLine('Pane split already active')
+      return
+    }
+    const sourcePane = editorPanes.find((pane) => pane.id === activePaneId) ?? editorPanes[0]
+    if (!sourcePane || sourcePane.tabIds.length === 0) {
+      setStatusLine('No tab available to split')
+      return
+    }
+    const primaryNoteId = sourcePane.activeNoteId || sourcePane.tabIds[0]
+    const splitPane: EditorPane = {
+      id: `pane-split-${Date.now()}`,
+      tabIds: [primaryNoteId],
+      activeNoteId: primaryNoteId,
+    }
+    setPaneSplitRatio(0.55)
+    commitPaneLayout([...editorPanes, splitPane], splitPane.id)
+    setStatusLine('Split editor pane')
+  }
+
+  function closePane(paneId: string): void {
+    if (editorPanes.length <= 1) {
+      return
+    }
+    const paneToClose = editorPanes.find((pane) => pane.id === paneId)
+    const remaining = editorPanes.filter((pane) => pane.id !== paneId)
+    if (!paneToClose || remaining.length === 0) {
+      return
+    }
+    const targetPane = remaining[0]
+    const mergedTabs = [...targetPane.tabIds]
+    for (const tabId of paneToClose.tabIds) {
+      if (!mergedTabs.includes(tabId)) {
+        mergedTabs.push(tabId)
+      }
+    }
+    const mergedPane: EditorPane = {
+      ...targetPane,
+      tabIds: mergedTabs,
+      activeNoteId: targetPane.activeNoteId || paneToClose.activeNoteId,
+    }
+    const nextPanes = [mergedPane, ...remaining.slice(1)]
+    setPaneSplitRatio(0.55)
+    commitPaneLayout(nextPanes, mergedPane.id)
+    setStatusLine('Closed split pane')
+  }
+
+  function moveActiveTabToOtherPane(fromPaneId: string): void {
+    if (editorPanes.length < 2) {
+      return
+    }
+    const fromPane = editorPanes.find((pane) => pane.id === fromPaneId)
+    const toPane = editorPanes.find((pane) => pane.id !== fromPaneId)
+    if (!fromPane || !toPane || !fromPane.activeNoteId) {
+      return
+    }
+    const movingId = fromPane.activeNoteId
+    if (toPane.tabIds.includes(movingId)) {
+      commitPaneLayout(
+        editorPanes.map((pane) =>
+          pane.id === toPane.id ? { ...pane, activeNoteId: movingId } : pane,
+        ),
+        toPane.id,
+      )
+      setStatusLine('Focused tab in adjacent pane')
+      return
+    }
+
+    const fromRemainingTabs = fromPane.tabIds.filter((tabId) => tabId !== movingId)
+    const toTabs = [...toPane.tabIds, movingId]
+    const nextPanes = editorPanes
+      .map((pane) => {
+        if (pane.id === fromPane.id) {
+          return {
+            ...pane,
+            tabIds: fromRemainingTabs,
+            activeNoteId: fromRemainingTabs[0] ?? '',
+          }
+        }
+        if (pane.id === toPane.id) {
+          return {
+            ...pane,
+            tabIds: toTabs,
+            activeNoteId: movingId,
+          }
+        }
+        return pane
+      })
+      .filter((pane) => pane.tabIds.length > 0)
+    commitPaneLayout(nextPanes, toPane.id)
+    setStatusLine('Moved tab to adjacent pane')
+  }
+
+  function upsertNote(note: VaultNote, shouldOpen = false): void {
+    setNotes((current) => {
+      const existingIndex = current.findIndex((item) => item.id === note.id)
+      if (existingIndex === -1) {
+        return [note, ...current]
+      }
+      const next = [...current]
+      next[existingIndex] = note
+      return next
+    })
+    if (shouldOpen) {
+      openNote(note.id, note.title)
+    }
+  }
+
+  function applyDesktopState(workspace: DesktopWorkspaceState, source: string): void {
+    setIsMacDesktop(workspace.isMacos)
+    setRegistryPath(workspace.registryPath)
+    setKnownVaults(workspace.vaults ?? [])
+    if (!workspace.activeVault) {
+      setActiveVaultRoot(null)
+      setActiveVaultName('No vault selected')
+      setStatusLine(`${source}: select a vault`)
+      return
+    }
+
+    setActiveVaultRoot(workspace.activeVault.rootPath)
+    setActiveVaultName(workspace.activeVault.name)
+    const vaultNotes = workspace.activeVault.notes.map(fromDesktopNote)
+    setNotes(vaultNotes)
+    const nextActive = vaultNotes[0]?.id ?? ''
+    const nextTabs = nextActive ? [nextActive] : []
+    setEditorPanes([
+      {
+        id: MAIN_EDITOR_PANE_ID,
+        tabIds: nextTabs,
+        activeNoteId: nextActive,
+      },
+    ])
+    setActivePaneId(MAIN_EDITOR_PANE_ID)
+    setPaneSplitRatio(0.55)
+    setActiveNoteId(nextActive)
+    setOpenTabs(nextTabs)
+    setRecentNotes(nextActive ? [nextActive] : [])
+    setStatusLine(`${source}: ${workspace.activeVault.name}`)
+  }
+
+  async function bootstrapDesktopWorkspace(): Promise<void> {
+    if (!isNativeDesktop) {
+      return
+    }
+    try {
+      const workspace = await invoke<DesktopWorkspaceState>('desktop_bootstrap')
+      applyDesktopState(workspace, 'Desktop bootstrap complete')
+    } catch (error) {
+      setStatusLine(`Desktop bootstrap failed: ${String(error)}`)
+    }
+  }
+
+  async function openVaultByPath(path: string, name?: string): Promise<void> {
+    if (!isNativeDesktop) {
+      setStatusLine('Vault open by path is available in desktop runtime')
+      return
+    }
+    const trimmedPath = path.trim()
+    if (!trimmedPath) {
+      setStatusLine('Vault path is empty')
+      return
+    }
+
+    setVaultActionBusy(true)
+    try {
+      const workspace = await invoke<DesktopWorkspaceState>('desktop_open_vault', {
+        path: trimmedPath,
+        name: name?.trim() || null,
+      })
+      applyDesktopState(workspace, 'Opened vault')
+      setVaultModalOpen(false)
+      setVaultPathInput('')
+      setVaultNameInput('')
+    } catch (error) {
+      setStatusLine(`Failed to open vault: ${String(error)}`)
+    } finally {
+      setVaultActionBusy(false)
+    }
+  }
+
+  async function switchVault(vaultId: string): Promise<void> {
+    if (!isNativeDesktop) {
+      return
+    }
+    setVaultActionBusy(true)
+    try {
+      const workspace = await invoke<DesktopWorkspaceState>('desktop_switch_vault', { vaultId })
+      applyDesktopState(workspace, 'Switched vault')
+      setVaultModalOpen(false)
+    } catch (error) {
+      setStatusLine(`Failed to switch vault: ${String(error)}`)
+    } finally {
+      setVaultActionBusy(false)
+    }
+  }
+
+  function queueDesktopSave(notePath: string, content: string): void {
+    if (!isNativeDesktop || !activeVaultRoot) {
+      return
+    }
+    const key = notePath
+    if (pendingSaves.current[key]) {
+      window.clearTimeout(pendingSaves.current[key])
+    }
+    pendingSaves.current[key] = window.setTimeout(() => {
+      void invoke('desktop_save_note', {
+        vaultRoot: activeVaultRoot,
+        notePath,
+        content,
+      }).catch((error) => {
+        setStatusLine(`Desktop save failed: ${String(error)}`)
+      })
+    }, 320)
+  }
+
+  function openNote(
+    noteId: string,
+    source: string,
+    trackHistory = true,
+    targetPaneId = activePaneId,
+  ): void {
     startTransition(() => {
       if (trackHistory && activeNoteId && activeNoteId !== noteId) {
         setHistoryBack((current) => [...current, activeNoteId].slice(-50))
         setHistoryForward([])
       }
-      setActiveNoteId(noteId)
-      setOpenTabs((current) => (current.includes(noteId) ? current : [...current, noteId]))
+      const destinationPane =
+        editorPanes.find((pane) => pane.id === targetPaneId) ?? editorPanes[0]
+      if (!destinationPane) {
+        return
+      }
+      const nextPanes = editorPanes.map((pane) => {
+        if (pane.id !== destinationPane.id) {
+          return pane
+        }
+        const nextTabs = pane.tabIds.includes(noteId) ? pane.tabIds : [...pane.tabIds, noteId]
+        return {
+          ...pane,
+          tabIds: nextTabs,
+          activeNoteId: noteId,
+        }
+      })
+      commitPaneLayout(nextPanes, destinationPane.id)
       setRecentNotes((current) => [noteId, ...current.filter((value) => value !== noteId)].slice(0, 20))
       setStatusLine(`Opened ${source}`)
     })
@@ -805,24 +1315,67 @@ function App() {
     })
   }
 
-  function closeTab(noteId: string): void {
+  function closeTab(noteId: string, paneId = activePaneId): void {
     if (pinnedTabs.includes(noteId)) {
       setStatusLine('Unpin tab before closing')
       return
     }
-    setOpenTabs((current) => {
-      if (current.length <= 1) {
-        return current
+    const pane = editorPanes.find((item) => item.id === paneId)
+    if (!pane) {
+      return
+    }
+    const totalTabs = editorPanes.reduce((count, item) => count + item.tabIds.length, 0)
+    if (totalTabs <= 1) {
+      setStatusLine('At least one tab must remain open')
+      return
+    }
+
+    if (pane.tabIds.length <= 1 && editorPanes.length > 1) {
+      const remainingPanes = editorPanes.filter((item) => item.id !== pane.id)
+      const focusPaneId = activePaneId === pane.id ? (remainingPanes[0]?.id ?? MAIN_EDITOR_PANE_ID) : activePaneId
+      commitPaneLayout(remainingPanes, focusPaneId)
+      setStatusLine('Closed pane')
+      return
+    }
+
+    const nextPanes = editorPanes.map((item) => {
+      if (item.id !== pane.id) {
+        return item
       }
-      const next = current.filter((item) => item !== noteId)
-      if (noteId === activeNoteId) {
-        setActiveNoteId(next[0] ?? '')
+      const nextTabs = item.tabIds.filter((tabId) => tabId !== noteId)
+      const nextActive = item.activeNoteId === noteId ? (nextTabs[0] ?? '') : item.activeNoteId
+      return {
+        ...item,
+        tabIds: nextTabs,
+        activeNoteId: nextActive,
       }
-      return next
     })
+    const focusPaneId = pane.id === activePaneId ? pane.id : activePaneId
+    commitPaneLayout(nextPanes, focusPaneId)
   }
 
   function createNote(): void {
+    if (isNativeDesktop && activeVaultRoot) {
+      const timestamp = new Date().toISOString().slice(11, 19).replaceAll(':', '')
+      const title = `Captured ${timestamp}`
+      void invoke<DesktopNoteSnapshot>('desktop_create_note', {
+        vaultRoot: activeVaultRoot,
+        title,
+        folder: '00 Inbox',
+        body: 'Start writing...',
+      })
+        .then((snapshot) => {
+          const note = fromDesktopNote(snapshot)
+          upsertNote(note, true)
+          openNote(note.id, note.title)
+          setStatusLine(`Created note ${note.title}`)
+        })
+        .catch((error) => {
+          setStatusLine(`Create note failed: ${String(error)}`)
+        })
+      return
+    }
+
     let nextIndex = notes.length + 1
     let slug = `captured-${nextIndex}`
     while (notes.some((note) => note.id === `note-${slug}`)) {
@@ -839,8 +1392,7 @@ function App() {
     }
     startTransition(() => {
       setNotes((current) => [nextNote, ...current])
-      setOpenTabs((current) => [nextNote.id, ...current])
-      setActiveNoteId(nextNote.id)
+      openNote(nextNote.id, nextNote.title)
       setStatusLine('Created new note')
     })
   }
@@ -868,19 +1420,28 @@ function App() {
     })
   }
 
-  function updateActiveContent(content: string, cursor?: number): void {
-    if (!activeNote) {
+  function updateNoteContent(noteId: string, content: string, cursor?: number): void {
+    const note = notesById.get(noteId)
+    if (!note) {
       return
     }
     setNotes((current) =>
       current.map((note) =>
-        note.id === activeNote.id ? { ...note, content, updatedAt: formatNow() } : note,
+        note.id === noteId ? { ...note, content, updatedAt: formatNow() } : note,
       ),
     )
-    if (typeof cursor === 'number') {
+    if (typeof cursor === 'number' && noteId === activeNoteId) {
       updateSlashState(content, cursor)
     }
-    setStatusLine(`Autosaved ${activeNote.title}`)
+    queueDesktopSave(note.path, content)
+    setStatusLine(`Autosaved ${note.title}`)
+  }
+
+  function updateActiveContent(content: string, cursor?: number): void {
+    if (!activeNote) {
+      return
+    }
+    updateNoteContent(activeNote.id, content, cursor)
   }
 
   function titleFromPath(path: string): string {
@@ -916,6 +1477,24 @@ function App() {
   }
 
   function openTodayDailyNote(): void {
+    if (isNativeDesktop && activeVaultRoot) {
+      void invoke<DesktopNoteSnapshot>('desktop_open_daily_note', {
+        vaultRoot: activeVaultRoot,
+        dailyFolder: dailyNoteConfig.folder,
+        dailyPattern: dailyNoteConfig.fileNamePattern,
+        dailyHeading: dailyNoteConfig.headingTemplate,
+      })
+        .then((snapshot) => {
+          const note = fromDesktopNote(snapshot)
+          upsertNote(note, true)
+          setStatusLine(`Opened daily note ${note.path}`)
+        })
+        .catch((error) => {
+          setStatusLine(`Open daily note failed: ${String(error)}`)
+        })
+      return
+    }
+
     const today = new Date()
     const path = dailyNotePathForDate(dailyNoteConfig, today)
     const note = ensureNoteByPath(path, dailyHeadingForDate(dailyNoteConfig, today))
@@ -927,6 +1506,29 @@ function App() {
     const trimmed = text.trim()
     if (!trimmed) {
       setStatusLine('Capture text is empty')
+      return
+    }
+
+    if (isNativeDesktop && activeVaultRoot) {
+      void invoke<DesktopCaptureResponse>('desktop_capture_append', {
+        vaultRoot: activeVaultRoot,
+        target,
+        text: trimmed,
+        notePath: activeNote?.path ?? null,
+        dailyFolder: dailyNoteConfig.folder,
+        dailyPattern: dailyNoteConfig.fileNamePattern,
+        dailyHeading: dailyNoteConfig.headingTemplate,
+      })
+        .then((response) => {
+          const note = fromDesktopNote(response.note)
+          upsertNote(note, true)
+          setCaptureOpen(false)
+          setCaptureText('')
+          setStatusLine(`Captured to ${note.path}`)
+        })
+        .catch((error) => {
+          setStatusLine(`Capture failed: ${String(error)}`)
+        })
       return
     }
 
@@ -1037,6 +1639,18 @@ function App() {
       case 'switcher:open':
         setQuickSwitcherOpen(true)
         return
+      case 'vaults:open-modal':
+        setVaultModalOpen(true)
+        return
+      case 'vaults:bootstrap-refresh':
+        void bootstrapDesktopWorkspace()
+        return
+      case 'graph:open-view':
+        setGraphOpen((value) => !value)
+        return
+      case 'settings:open':
+        setSettingsOpen((value) => !value)
+        return
       case 'app:go-back':
         navigateBack()
         return
@@ -1058,7 +1672,7 @@ function App() {
         })
         return
       case 'workspace:split-vertical':
-        setEditorMode('split')
+        splitActivePane()
         return
       case 'app:toggle-left-sidebar':
         setLeftSidebarVisible((value) => !value)
@@ -1142,6 +1756,30 @@ function App() {
       description: 'Find and open a note by title',
     },
     {
+      id: 'vaults:open-modal',
+      name: 'Open vault manager',
+      hotkey: commandHotkey('vaults:open-modal', 'Mod+Shift+V'),
+      description: 'Open or switch local vaults in desktop runtime',
+    },
+    {
+      id: 'vaults:bootstrap-refresh',
+      name: 'Refresh desktop workspace',
+      hotkey: commandHotkey('vaults:bootstrap-refresh', 'Mod+Shift+B'),
+      description: 'Reload vault index and desktop registry state',
+    },
+    {
+      id: 'graph:open-view',
+      name: 'Open graph view',
+      hotkey: commandHotkey('graph:open-view', 'Mod+G'),
+      description: 'Open graph relationships for current vault notes',
+    },
+    {
+      id: 'settings:open',
+      name: 'Open settings',
+      hotkey: commandHotkey('settings:open', 'Mod+,'),
+      description: 'Open workspace settings panel',
+    },
+    {
       id: 'app:go-back',
       name: 'Go back',
       hotkey: commandHotkey('app:go-back', 'Mod+['),
@@ -1167,9 +1805,9 @@ function App() {
     },
     {
       id: 'workspace:split-vertical',
-      name: 'Open split editor',
+      name: 'Split active pane right',
       hotkey: commandHotkey('workspace:split-vertical', 'Mod+Backslash'),
-      description: 'Show source and preview side by side',
+      description: 'Create adjacent pane with its own tab stack',
     },
     {
       id: 'app:toggle-left-sidebar',
@@ -1254,6 +1892,48 @@ function App() {
   }, [dailyNoteConfig])
 
   useEffect(() => {
+    void bootstrapDesktopWorkspace()
+    const cleanupTimers = pendingSaves.current
+    return () => {
+      for (const key of Object.keys(cleanupTimers)) {
+        window.clearTimeout(cleanupTimers[key])
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!paneResizeActive || editorPanes.length < 2) {
+      return
+    }
+
+    function onMouseMove(event: MouseEvent): void {
+      const container = paneDockRef.current
+      if (!container) {
+        return
+      }
+      const bounds = container.getBoundingClientRect()
+      if (bounds.width <= 0) {
+        return
+      }
+      const ratio = (event.clientX - bounds.left) / bounds.width
+      const boundedRatio = Math.min(0.75, Math.max(0.25, ratio))
+      setPaneSplitRatio(boundedRatio)
+    }
+
+    function stopResize(): void {
+      setPaneResizeActive(false)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', stopResize)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', stopResize)
+    }
+  }, [paneResizeActive, editorPanes.length])
+
+  useEffect(() => {
     const keyboundCommands = commands
       .filter((command) => command.hotkey.trim() !== '')
       .map((command) => ({ id: command.id, hotkey: command.hotkey }))
@@ -1267,6 +1947,10 @@ function App() {
           'file-explorer:new-file',
           'command-palette:open',
           'switcher:open',
+          'vaults:open-modal',
+          'vaults:bootstrap-refresh',
+          'graph:open-view',
+          'settings:open',
           'capture:append-inbox',
           'capture:append-daily',
           'capture:append-active-note',
@@ -1344,13 +2028,176 @@ function App() {
   }, {})
   const folderEntries = Object.entries(folderGroups).sort((a, b) => a[0].localeCompare(b[0]))
 
+  function renderEditorPane(pane: EditorPane): React.ReactNode {
+    const isFocused = pane.id === activePaneId
+    const paneActiveNote =
+      notesById.get(pane.activeNoteId) ?? notesById.get(pane.tabIds[0] ?? '') ?? null
+
+    return (
+      <section
+        key={pane.id}
+        className={isFocused ? 'editor-pane is-focused' : 'editor-pane'}
+        onMouseDown={() => focusPane(pane.id)}
+      >
+        <div className="tabbar">
+          {pane.tabIds.map((tabId) => {
+            const note = notesById.get(tabId)
+            if (!note) {
+              return null
+            }
+            const pinned = pinnedTabs.includes(tabId)
+            const isTabActive = paneActiveNote ? paneActiveNote.id === tabId : false
+            return (
+              <div key={tabId} className={isTabActive ? 'tab is-active' : 'tab'}>
+                <button type="button" onClick={() => openNote(tabId, note.title, true, pane.id)}>
+                  {note.title}
+                </button>
+                <button
+                  type="button"
+                  className={pinned ? 'tab-pin is-pinned' : 'tab-pin'}
+                  onClick={() => togglePin(tabId)}
+                  title={pinned ? 'Unpin tab' : 'Pin tab'}
+                >
+                  {pinned ? 'P' : 'p'}
+                </button>
+                <button
+                  type="button"
+                  className="tab-close"
+                  onClick={() => closeTab(tabId, pane.id)}
+                >
+                  ×
+                </button>
+              </div>
+            )
+          })}
+          <div className="pane-tab-actions">
+            {editorPanes.length === 1 && (
+              <button type="button" onClick={() => splitActivePane()}>
+                Split
+              </button>
+            )}
+            {editorPanes.length > 1 && (
+              <>
+                <button type="button" onClick={() => moveActiveTabToOtherPane(pane.id)}>
+                  Move
+                </button>
+                <button type="button" onClick={() => closePane(pane.id)}>
+                  Close Pane
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {paneActiveNote ? (
+          <div className={editorMode === 'split' ? 'editor-panels split' : 'editor-panels'}>
+            {(editorMode === 'source' || editorMode === 'split') && (
+              <textarea
+                ref={isFocused ? editorRef : null}
+                className="source-editor"
+                value={paneActiveNote.content}
+                onFocus={() => focusPane(pane.id)}
+                onChange={(event) =>
+                  updateNoteContent(
+                    paneActiveNote.id,
+                    event.target.value,
+                    isFocused ? event.currentTarget.selectionStart : undefined,
+                  )
+                }
+                onClick={(event) => {
+                  if (isFocused) {
+                    updateSlashState(event.currentTarget.value, event.currentTarget.selectionStart)
+                  }
+                }}
+                onKeyUp={(event) => {
+                  if (isFocused) {
+                    updateSlashState(event.currentTarget.value, event.currentTarget.selectionStart)
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (!isFocused || !slashState.isOpen) {
+                    return
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
+                  } else if (event.key === 'Enter' && filteredSlashCommands.length > 0) {
+                    event.preventDefault()
+                    insertSlashCommand(filteredSlashCommands[0])
+                  }
+                }}
+                spellCheck={false}
+              />
+            )}
+            {(editorMode === 'preview' || editorMode === 'split') && (
+              <article className="preview-pane" onMouseDown={() => focusPane(pane.id)}>
+                {renderMarkdown(paneActiveNote.content)}
+              </article>
+            )}
+            {isFocused && slashState.isOpen && editorMode !== 'preview' && (
+              <section className="slash-panel">
+                <header>
+                  <strong>Slash Commands</strong>
+                  <small>Press Enter to apply first match</small>
+                </header>
+                <div className="slash-list">
+                  {filteredSlashCommands.map((command) => (
+                    <button
+                      key={command.id}
+                      type="button"
+                      className="slash-item"
+                      onClick={() => insertSlashCommand(command)}
+                    >
+                      <span>{command.name}</span>
+                      <small>{command.description}</small>
+                    </button>
+                  ))}
+                  {filteredSlashCommands.length === 0 && (
+                    <p className="muted">No slash command matches.</p>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+        ) : (
+          <div className="empty-state">No note selected</div>
+        )}
+      </section>
+    )
+  }
+
+  function ribbonActionIsActive(actionId: string): boolean {
+    if (actionId === 'app:toggle-left-sidebar') {
+      return leftSidebarVisible
+    }
+    if (actionId === 'app:toggle-right-sidebar') {
+      return rightSidebarVisible
+    }
+    if (actionId === 'graph:open-view') {
+      return graphOpen
+    }
+    if (actionId === 'settings:open') {
+      return settingsOpen
+    }
+    if (actionId === 'theme:toggle-light-dark') {
+      return theme === 'light'
+    }
+    return false
+  }
+
   return (
     <main className="tf-shell">
       <header className="topbar">
         <div className="topbar-left">
           <strong className="brand">Thoughtforge</strong>
-          <span className="vault-name">Vault: Thoughtforge Core</span>
-          <span className="meta-pill">Obsidian-class workspace shell</span>
+          <span className="vault-name">Vault: {activeVaultName}</span>
+          <span className="meta-pill">
+            {isNativeDesktop
+              ? isMacDesktop
+                ? 'macOS desktop runtime'
+                : 'desktop runtime'
+              : 'web shell mode'}
+          </span>
         </div>
         <div className="topbar-actions">
           <button type="button" onClick={() => navigateBack()}>
@@ -1364,6 +2211,15 @@ function App() {
           </button>
           <button type="button" onClick={() => setCommandPaletteOpen(true)}>
             Command Palette
+          </button>
+          <button type="button" onClick={() => setGraphOpen(true)}>
+            Graph
+          </button>
+          <button type="button" onClick={() => setSettingsOpen(true)}>
+            Settings
+          </button>
+          <button type="button" onClick={() => setVaultModalOpen(true)}>
+            Vaults
           </button>
           <button
             type="button"
@@ -1383,7 +2239,39 @@ function App() {
         </div>
       </header>
 
-      <section className="workspace">
+      <section className="workspace-shell">
+        <aside className="activity-ribbon" aria-label="Activity ribbon">
+          <div className="ribbon-group">
+            {RIBBON_PRIMARY_ACTIONS.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className={ribbonActionIsActive(action.id) ? 'ribbon-button is-active' : 'ribbon-button'}
+                title={`${action.label} (${action.description})`}
+                aria-label={action.label}
+                onClick={() => executeCommandById(action.id)}
+              >
+                {action.glyph}
+              </button>
+            ))}
+          </div>
+          <div className="ribbon-group ribbon-group-bottom">
+            {RIBBON_SECONDARY_ACTIONS.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className={ribbonActionIsActive(action.id) ? 'ribbon-button is-active' : 'ribbon-button'}
+                title={`${action.label} (${action.description})`}
+                aria-label={action.label}
+                onClick={() => executeCommandById(action.id)}
+              >
+                {action.glyph}
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="workspace">
         {leftSidebarVisible && (
           <aside className="sidebar sidebar-left">
             <div className="panel-title">
@@ -1421,34 +2309,6 @@ function App() {
         )}
 
         <section className="editor-shell">
-          <div className="tabbar">
-            {openTabs.map((tabId) => {
-              const note = notesById.get(tabId)
-              if (!note) {
-                return null
-              }
-              const pinned = pinnedTabs.includes(tabId)
-              return (
-                <div key={tabId} className={tabId === activeNoteId ? 'tab is-active' : 'tab'}>
-                  <button type="button" onClick={() => openNote(tabId, note.title)}>
-                    {note.title}
-                  </button>
-                  <button
-                    type="button"
-                    className={pinned ? 'tab-pin is-pinned' : 'tab-pin'}
-                    onClick={() => togglePin(tabId)}
-                    title={pinned ? 'Unpin tab' : 'Pin tab'}
-                  >
-                    {pinned ? 'P' : 'p'}
-                  </button>
-                  <button type="button" className="tab-close" onClick={() => closeTab(tabId)}>
-                    ×
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
           <div className="editor-toolbar">
             <div className="editor-mode">
               <button
@@ -1482,69 +2342,33 @@ function App() {
               </button>
             </div>
           </div>
-
-          {activeNote ? (
-            <div className={editorMode === 'split' ? 'editor-panels split' : 'editor-panels'}>
-              {(editorMode === 'source' || editorMode === 'split') && (
-                <textarea
-                  ref={editorRef}
-                  className="source-editor"
-                  value={activeNote.content}
-                  onChange={(event) =>
-                    updateActiveContent(event.target.value, event.currentTarget.selectionStart)
-                  }
-                  onClick={(event) =>
-                    updateSlashState(event.currentTarget.value, event.currentTarget.selectionStart)
-                  }
-                  onKeyUp={(event) =>
-                    updateSlashState(event.currentTarget.value, event.currentTarget.selectionStart)
-                  }
-                  onKeyDown={(event) => {
-                    if (!slashState.isOpen) {
-                      return
-                    }
-                    if (event.key === 'Escape') {
-                      event.preventDefault()
-                      setSlashState({ isOpen: false, query: '', replaceStart: 0, replaceEnd: 0 })
-                    } else if (event.key === 'Enter' && filteredSlashCommands.length > 0) {
-                      event.preventDefault()
-                      insertSlashCommand(filteredSlashCommands[0])
-                    }
+          <div
+            ref={paneDockRef}
+            className={editorPanes.length > 1 ? 'pane-dock is-split' : 'pane-dock'}
+          >
+            {editorPanes.length === 0 && <div className="empty-state">No note selected</div>}
+            {editorPanes.length === 1 && renderEditorPane(editorPanes[0])}
+            {editorPanes.length > 1 && (
+              <>
+                <div className="pane-slot" style={{ flexBasis: `${paneSplitRatio * 100}%` }}>
+                  {renderEditorPane(editorPanes[0])}
+                </div>
+                <div
+                  className="pane-resizer"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize panes"
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    setPaneResizeActive(true)
                   }}
-                  spellCheck={false}
                 />
-              )}
-              {(editorMode === 'preview' || editorMode === 'split') && (
-                <article className="preview-pane">{renderMarkdown(activeNote.content)}</article>
-              )}
-              {slashState.isOpen && editorMode !== 'preview' && (
-                <section className="slash-panel">
-                  <header>
-                    <strong>Slash Commands</strong>
-                    <small>Press Enter to apply first match</small>
-                  </header>
-                  <div className="slash-list">
-                    {filteredSlashCommands.map((command) => (
-                      <button
-                        key={command.id}
-                        type="button"
-                        className="slash-item"
-                        onClick={() => insertSlashCommand(command)}
-                      >
-                        <span>{command.name}</span>
-                        <small>{command.description}</small>
-                      </button>
-                    ))}
-                    {filteredSlashCommands.length === 0 && (
-                      <p className="muted">No slash command matches.</p>
-                    )}
-                  </div>
-                </section>
-              )}
-            </div>
-          ) : (
-            <div className="empty-state">No note selected</div>
-          )}
+                <div className="pane-slot" style={{ flexBasis: `${(1 - paneSplitRatio) * 100}%` }}>
+                  {renderEditorPane(editorPanes[1])}
+                </div>
+              </>
+            )}
+          </div>
         </section>
 
         {rightSidebarVisible && (
@@ -1777,12 +2601,230 @@ function App() {
           </aside>
         )}
       </section>
+      </section>
 
       <footer className="statusbar">
         <span>{statusLine}</span>
-        <span>{notes.length} notes indexed</span>
-        <span>Mode: {editorMode}</span>
+        <span>
+          {notes.length} notes indexed
+          {activeVaultRoot ? ` • ${activeVaultRoot}` : ''}
+        </span>
+        <span>
+          Mode: {editorMode} • {isNativeDesktop ? 'desktop' : 'web'}
+        </span>
       </footer>
+
+      {graphOpen && (
+        <div className="overlay" onClick={() => setGraphOpen(false)} role="presentation">
+          <section
+            className="modal graph-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Graph View</h2>
+              <button type="button" onClick={() => setGraphOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="graph-summary">
+              <span>{notes.length} nodes</span>
+              <span>{graphEdges.length} links</span>
+              {activeNote && <span>Focused: {activeNote.title}</span>}
+            </div>
+            <div className="graph-grid">
+              <section className="inspector-card">
+                <h3>Focused Neighborhood</h3>
+                {activeNote && activeGraphNeighbors.length === 0 && (
+                  <p className="muted">No linked notes for current focus.</p>
+                )}
+                {!activeNote && <p className="muted">No active note selected.</p>}
+                <ul>
+                  {activeGraphNeighbors.map((note) => (
+                    <li key={`graph-neighbor-${note.id}`}>
+                      <button
+                        type="button"
+                        className="inline-link"
+                        onClick={() => {
+                          openNote(note.id, `graph:${note.title}`)
+                          setGraphOpen(false)
+                        }}
+                      >
+                        {note.title}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              <section className="inspector-card">
+                <h3>Node Degrees</h3>
+                <div className="graph-node-list">
+                  {[...notes]
+                    .sort((a, b) => {
+                      const left = graphMetricsByNote[a.id]
+                      const right = graphMetricsByNote[b.id]
+                      const leftScore = (left?.incoming ?? 0) + (left?.outgoing ?? 0)
+                      const rightScore = (right?.incoming ?? 0) + (right?.outgoing ?? 0)
+                      return rightScore - leftScore
+                    })
+                    .map((note) => {
+                      const score = graphMetricsByNote[note.id] ?? { incoming: 0, outgoing: 0 }
+                      return (
+                        <button
+                          key={`graph-node-${note.id}`}
+                          type="button"
+                          className="graph-node-row"
+                          onClick={() => openNote(note.id, `graph:${note.title}`)}
+                        >
+                          <span>{note.title}</span>
+                          <span className="graph-pill">
+                            in {score.incoming} • out {score.outgoing}
+                          </span>
+                        </button>
+                      )
+                    })}
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="overlay" onClick={() => setSettingsOpen(false)} role="presentation">
+          <section
+            className="modal settings-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Workspace Settings</h2>
+              <button type="button" onClick={() => setSettingsOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="settings-grid">
+              <section className="inspector-card">
+                <h3>Interface</h3>
+                <div className="capture-actions">
+                  <button type="button" onClick={() => setTheme('dark')}>
+                    Dark
+                  </button>
+                  <button type="button" onClick={() => setTheme('light')}>
+                    Light
+                  </button>
+                </div>
+                <div className="capture-actions">
+                  <button type="button" onClick={() => setLeftSidebarVisible((value) => !value)}>
+                    Toggle Left Sidebar
+                  </button>
+                  <button type="button" onClick={() => setRightSidebarVisible((value) => !value)}>
+                    Toggle Right Sidebar
+                  </button>
+                </div>
+                <div className="capture-actions">
+                  <button type="button" onClick={() => setEditorMode('source')}>
+                    Source
+                  </button>
+                  <button type="button" onClick={() => setEditorMode('preview')}>
+                    Preview
+                  </button>
+                  <button type="button" onClick={() => setEditorMode('split')}>
+                    Split
+                  </button>
+                </div>
+              </section>
+
+              <section className="inspector-card">
+                <h3>Daily Note Defaults</h3>
+                <label className="binding-row">
+                  <span>Folder</span>
+                  <input
+                    type="text"
+                    value={dailyNoteConfig.folder}
+                    onChange={(event) =>
+                      setDailyNoteConfig((current) => ({
+                        ...current,
+                        folder: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="binding-row">
+                  <span>File Pattern</span>
+                  <input
+                    type="text"
+                    value={dailyNoteConfig.fileNamePattern}
+                    onChange={(event) =>
+                      setDailyNoteConfig((current) => ({
+                        ...current,
+                        fileNamePattern: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="binding-row">
+                  <span>Heading Template</span>
+                  <input
+                    type="text"
+                    value={dailyNoteConfig.headingTemplate}
+                    onChange={(event) =>
+                      setDailyNoteConfig((current) => ({
+                        ...current,
+                        headingTemplate: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </section>
+
+              <section className="inspector-card">
+                <h3>Hotkeys</h3>
+                <div className="binding-grid">
+                  {commands.slice(0, 15).map((command) => (
+                    <label key={`settings-binding-${command.id}`} className="binding-row">
+                      <span>{command.name}</span>
+                      <input
+                        type="text"
+                        value={persistedBindings[command.id] ?? command.hotkey}
+                        onChange={(event) =>
+                          updateCommandBinding(command.id, event.target.value)
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              </section>
+
+              <section className="inspector-card">
+                <h3>Vault Runtime</h3>
+                <p>
+                  <strong>Mode:</strong>{' '}
+                  {isNativeDesktop ? (isMacDesktop ? 'macOS desktop runtime' : 'desktop runtime') : 'web'}
+                </p>
+                <p>
+                  <strong>Vault:</strong> {activeVaultName}
+                </p>
+                {activeVaultRoot && (
+                  <p>
+                    <strong>Root:</strong> {activeVaultRoot}
+                  </p>
+                )}
+                <div className="capture-actions">
+                  <button type="button" onClick={() => setVaultModalOpen(true)}>
+                    Manage Vaults
+                  </button>
+                  <button type="button" onClick={() => setCommandPaletteOpen(true)}>
+                    Open Commands
+                  </button>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
 
       {commandPaletteOpen && (
         <div className="overlay" onClick={() => setCommandPaletteOpen(false)} role="presentation">
@@ -1853,6 +2895,92 @@ function App() {
                   <small>{note.updatedAt}</small>
                 </button>
               ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {vaultModalOpen && (
+        <div className="overlay" onClick={() => setVaultModalOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Vaults</h2>
+              <button type="button" onClick={() => setVaultModalOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-modal-body">
+              <label className="binding-row">
+                <span>Open Vault Path</span>
+                <input
+                  type="text"
+                  value={vaultPathInput}
+                  onChange={(event) => setVaultPathInput(event.target.value)}
+                  placeholder="/Users/you/Documents/MyVault"
+                />
+              </label>
+              <label className="binding-row">
+                <span>Optional Display Name</span>
+                <input
+                  type="text"
+                  value={vaultNameInput}
+                  onChange={(event) => setVaultNameInput(event.target.value)}
+                  placeholder="Personal Vault"
+                />
+              </label>
+              <div className="capture-actions">
+                <button
+                  type="button"
+                  disabled={vaultActionBusy}
+                  onClick={() => {
+                    void openVaultByPath(vaultPathInput, vaultNameInput)
+                  }}
+                >
+                  Open Path
+                </button>
+              </div>
+
+              <section className="inspector-card">
+                <h3>Registered Vaults</h3>
+                {knownVaults.length === 0 && <p className="muted">No registered vaults yet.</p>}
+                {knownVaults.length > 0 && (
+                  <ul>
+                    {knownVaults.map((vault) => (
+                      <li key={vault.id}>
+                        <button
+                          type="button"
+                          className="inline-link"
+                          disabled={vaultActionBusy}
+                          onClick={() => {
+                            if (vault.isActive) {
+                              setVaultModalOpen(false)
+                              return
+                            }
+                            void switchVault(vault.id)
+                          }}
+                        >
+                          {vault.name}
+                        </button>{' '}
+                        <small>{vault.rootPath}</small>
+                        {vault.isActive && <em> (active)</em>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {registryPath && (
+                <p className="muted">
+                  Registry:
+                  {' '}
+                  <code>{registryPath}</code>
+                </p>
+              )}
             </div>
           </section>
         </div>

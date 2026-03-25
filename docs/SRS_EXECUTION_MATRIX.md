@@ -1,6 +1,6 @@
 # SRS Execution Matrix
 
-Generated from `docs/SRS.md` at `2026-03-24T21:22:36Z`.
+Generated from `docs/SRS.md` at `2026-03-24T21:40:32Z`.
 
 Legend:
 - `todo`: not started
@@ -19,6 +19,8 @@ Legend:
 | `FR-WV-007` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support encrypted app secrets and provider credentials. |
 | `FR-WV-008` | `Should` | M1 - Vault and Capture Foundation | `todo` | The system should support deep-link protocol actions using `thoughtforge://` URIs for opening vaults, notes, and agent-safe actions. |
 | `FR-WV-009` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should restore the previous workspace session including active vault, open tabs, and layout state on startup. |
+| `FR-WV-010` | `Must` | M1 - Vault and Capture Foundation | `done` | The desktop runtime shall support opening and switching local vaults through a native command bridge. |
+| `FR-WV-011` | `Must` | M1 - Vault and Capture Foundation | `done` | The desktop runtime shall persist note creation, note edits, and capture appends directly to vault files. |
 | `FR-CI-001` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall support instant creation of a new note from keyboard-driven flows. |
 | `FR-CI-002` | `Must` | M1 - Vault and Capture Foundation | `done` | The system shall support append flows to inbox notes, daily notes, and selected notes. |
 | `FR-CI-003` | `Must` | M1 - Vault and Capture Foundation | `todo` | The system shall support drag-and-drop or picker-based attachment import. |
@@ -137,6 +139,7 @@ Legend:
 | `FR-IE-009` | `Should` | M8 - Interop and CLI | `done` | The system should allow plugins to register command IDs into the global command bus. |
 | `FR-IE-010` | `Should` | M8 - Interop and CLI | `todo` | The system should support user-controlled theme packages and CSS snippet overlays in workspace configuration. |
 | `FR-IE-011` | `Should` | M8 - Interop and CLI | `todo` | The system should support startup safe mode that loads only core plugins and disables third-party extensions. |
+| `FR-IE-012` | `Should` | M8 - Interop and CLI | `done` | The desktop app should expose typed invoke commands for bootstrap, vault lifecycle, note lifecycle, and capture flows. |
 | `FR-SP-001` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall require explicit user approval for destructive or external side-effecting agent actions. |
 | `FR-SP-002` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall separate trusted core code from less-trusted frontend and plugin execution contexts. |
 | `FR-SP-003` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall support provider-level data sharing controls. |

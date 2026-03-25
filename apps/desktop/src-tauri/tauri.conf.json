@@ -4,20 +4,29 @@
   "version": "0.1.0",
   "identifier": "com.protheuslabs.thoughtforge",
   "build": {
-    "beforeDevCommand": "npm --prefix .. run dev",
-    "beforeBuildCommand": "npm --prefix .. run build",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Thoughtforge",
         "width": 1400,
         "height": 900,
-        "resizable": true
+        "resizable": true,
+        "minWidth": 980,
+        "minHeight": 680
       }
     ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    }
   }
 }
-
