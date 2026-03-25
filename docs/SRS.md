@@ -4,8 +4,8 @@
 
 - Product: Thoughtforge
 - Document type: Software Requirements Specification
-- Version: 0.4
-- Date: 2026-03-17
+- Version: 0.5
+- Date: 2026-03-25
 - Status: Draft for product-definition phase
 
 ## 2. Purpose
@@ -227,6 +227,36 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 - FR-ED-018 (Should): The system should support recent-files and navigation-history jumps in the workspace.
   Acceptance: A user can quickly return to recently opened files or step through note navigation history.
 
+- FR-ED-019 (Should): The system should surface unlinked mentions for the active note and support one-click conversion to wikilinks.
+  Acceptance: A user can open the inspector, see candidate unlinked mentions, and convert a mention into a `[[wikilink]]` without manual text editing.
+
+- FR-ED-020 (Should): The system should support named workspace presets that capture tabs, panes, active note, and shell visibility state.
+  Acceptance: A user can save, load, and delete workspace presets and recover a known context layout in one action.
+
+- FR-ED-021 (Should): The system should maintain local history snapshots for notes and allow point-in-time restore.
+  Acceptance: A user can open local history, select a snapshot for a note, and restore it to the editor.
+
+- FR-ED-022 (Should): The system should support reusable note templates with token substitution for date/time insertion.
+  Acceptance: A user can open the template selector and insert template content into the active note at cursor position.
+
+- FR-ED-023 (Should): The system should include a note composer for extract-to-note and merge-note workflows.
+  Acceptance: A user can extract a selected passage into a new note or merge another note into the active note from one modal.
+
+- FR-ED-024 (Should): The system should provide hover previews for linked notes in preview mode.
+  Acceptance: Hovering a wikilink shows a compact note preview without navigating away from the active note.
+
+- FR-ED-025 (Should): The system should support undo-close-tab and stacked-tab display modes.
+  Acceptance: A user can reopen the most recently closed tab and toggle wrapped tab rows for dense tab workflows.
+
+- FR-ED-026 (Should): The system should allow customizable ordering of ribbon actions.
+  Acceptance: A user can reorder top and bottom ribbon actions through a ribbon configuration interface and persist the order.
+
+- FR-ED-027 (Should): The system should provide an Obsidian-aligned desktop shell layout baseline.
+  Acceptance: The workspace presents activity ribbon, file explorer, multi-tab editor panes, and inspector columns in an Obsidian-like arrangement.
+
+- FR-ED-028 (Should): The system should include a canvas workspace with draggable note cards.
+  Acceptance: A user can open canvas view, reposition cards, and open notes directly from canvas cards.
+
 ### 9.4 Context Objects and Relationships
 
 - FR-CX-001 (Must): The system shall support first-class context objects for `Intent`, `Project`, `Task`, `Decision`, `Commitment`, `Assumption`, `OpenQuestion`, `Entity`, `Resource`, `Constraint`, `Conversation`, `Delegation`, `Approval`, and `StateDelta`.
@@ -379,6 +409,15 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 
 - FR-SR-011 (Should): The system should support interactive global and local graph views for notes, objects, and relationships.
   Acceptance: A user can pivot from one node into its local neighborhood and open linked artifacts directly.
+
+- FR-SR-012 (Should): The system should support scoped lexical search tokens for path, title, tags, task state, property keys, and full text.
+  Acceptance: A user can run tokenized queries such as `tag:#project path:01` and receive filtered result sets with snippets.
+
+- FR-SR-013 (Should): The system should support bookmarkable searches and note bookmarks in one manager.
+  Acceptance: A user can save search queries or note shortcuts, then reopen them from bookmarks without rebuilding query state.
+
+- FR-SR-014 (Should): The system should support structured note bases with table, list, and card views.
+  Acceptance: A user can switch between table/list/card base views, filter rows, sort rows, and open source notes from any view.
 
 ### 9.10 Knowledge Graph and Structured Context
 

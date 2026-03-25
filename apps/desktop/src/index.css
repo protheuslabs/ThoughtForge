@@ -1,36 +1,34 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-
 :root {
-  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, Menlo, ui-monospace, monospace;
 }
 
 body[data-theme='dark'] {
-  --bg: #171a1f;
-  --surface-base: #20242b;
-  --surface-elevated: #272d36;
-  --surface-hover: #2f3743;
-  --surface-active: #394454;
-  --edge: #3f4a5c;
-  --text: #d7dee8;
-  --text-strong: #f2f6fd;
-  --text-muted: #a8b1be;
-  --text-dim: #8c96a7;
-  --accent: #79b4ff;
+  --bg: #181b1f;
+  --surface-base: #202327;
+  --surface-elevated: #262a30;
+  --surface-hover: #2d3239;
+  --surface-active: #373e48;
+  --edge: #383e47;
+  --text: #d6dbe4;
+  --text-strong: #f0f3f8;
+  --text-muted: #a5aebb;
+  --text-dim: #8892a0;
+  --accent: #7ba2ff;
 }
 
 body[data-theme='light'] {
-  --bg: #e6ebf3;
-  --surface-base: #f9fbff;
-  --surface-elevated: #f2f5fb;
-  --surface-hover: #e8edf7;
-  --surface-active: #dce4f2;
-  --edge: #c1ccdd;
-  --text: #2e3745;
-  --text-strong: #101722;
-  --text-muted: #4f6079;
-  --text-dim: #6f7f96;
-  --accent: #155ee8;
+  --bg: #dfe4ed;
+  --surface-base: #f8f9fc;
+  --surface-elevated: #eff2f8;
+  --surface-hover: #e6ebf5;
+  --surface-active: #d7dfed;
+  --edge: #c2cbdd;
+  --text: #27303f;
+  --text-strong: #121824;
+  --text-muted: #526279;
+  --text-dim: #6f8099;
+  --accent: #215ddd;
 }
 
 *,
@@ -45,14 +43,11 @@ body {
   font-family: var(--font-sans);
   line-height: 1.45;
   color: var(--text);
-  background:
-    radial-gradient(circle at 12% 4%, rgba(121, 180, 255, 0.18), transparent 32%),
-    radial-gradient(circle at 88% -2%, rgba(91, 243, 180, 0.11), transparent 24%),
-    var(--bg);
+  background: var(--bg);
 }
 
 #root {
-  padding: 0.8rem;
+  padding: 0.35rem;
   max-width: 100%;
 }
 

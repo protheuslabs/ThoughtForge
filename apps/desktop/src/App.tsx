@@ -74,6 +74,55 @@ type TabDropTarget = {
   index: number
 }
 
+type WorkspacePreset = {
+  id: string
+  name: string
+  layout: PersistedWorkspaceLayout
+  panes: EditorPane[]
+  updatedAt: string
+}
+
+type LocalHistorySnapshot = {
+  id: string
+  noteId: string
+  timestamp: number
+  content: string
+}
+
+type BookmarkItem = {
+  id: string
+  type: 'note' | 'search'
+  label: string
+  noteId?: string
+  query?: string
+}
+
+type NoteTemplate = {
+  id: string
+  name: string
+  content: string
+}
+
+type RibbonConfig = {
+  primaryActionIds: string[]
+  secondaryActionIds: string[]
+}
+
+type SearchResult = {
+  noteId: string
+  title: string
+  path: string
+  snippet: string
+}
+
+type CanvasCard = {
+  noteId: string
+  x: number
+  y: number
+}
+
+type BasesViewMode = 'table' | 'list' | 'cards'
+
 type DesktopVaultSummary = {
   id: string
   name: string
@@ -217,6 +266,13 @@ Linked from [[Project Dossier]] and [[Agent Context Model]].`,
 const LAYOUT_STORAGE_KEY = 'thoughtforge.workspace.layout.v1'
 const COMMAND_BINDINGS_KEY = 'thoughtforge.command.bindings.v1'
 const DAILY_NOTE_CONFIG_KEY = 'thoughtforge.capture.daily.v1'
+const WORKSPACE_PRESETS_KEY = 'thoughtforge.workspace.presets.v1'
+const LOCAL_HISTORY_KEY = 'thoughtforge.local.history.v1'
+const BOOKMARKS_KEY = 'thoughtforge.bookmarks.v1'
+const TEMPLATES_KEY = 'thoughtforge.templates.v1'
+const RIBBON_CONFIG_KEY = 'thoughtforge.ribbon.config.v1'
+const STACKED_TABS_KEY = 'thoughtforge.stacked.tabs.v1'
+const CANVAS_LAYOUT_KEY = 'thoughtforge.canvas.layout.v1'
 const MAIN_EDITOR_PANE_ID = 'pane-main'
 
 const DEFAULT_DAILY_NOTE_CONFIG: DailyNoteConfig = {
@@ -224,6 +280,25 @@ const DEFAULT_DAILY_NOTE_CONFIG: DailyNoteConfig = {
   fileNamePattern: '%Y-%m-%d',
   headingTemplate: '# Daily Note - {date}',
 }
+
+const DEFAULT_TEMPLATES: NoteTemplate[] = [
+  {
+    id: 'template-decision',
+    name: 'Decision Record',
+    content:
+      '## Decision\nstatus:: proposed\nowner:: \ncontext:: \nrationale:: \nalternatives:: \n',
+  },
+  {
+    id: 'template-standup',
+    name: 'Standup Update',
+    content: '## Standup\nYesterday:: \nToday:: \nBlockers:: \n',
+  },
+  {
+    id: 'template-evidence',
+    name: 'Evidence Capture',
+    content: 'source:: \ncaptured_at:: {{time}}\n\n> ',
+  },
+]
 
 const SLASH_COMMANDS: SlashCommand[] = [
   {
@@ -329,6 +404,11 @@ const RIBBON_SECONDARY_ACTIONS: RibbonAction[] = [
   },
 ]
 
+const DEFAULT_RIBBON_CONFIG: RibbonConfig = {
+  primaryActionIds: RIBBON_PRIMARY_ACTIONS.map((action) => action.id),
+  secondaryActionIds: RIBBON_SECONDARY_ACTIONS.map((action) => action.id),
+}
+
 type PersistedWorkspaceLayout = {
   notes: VaultNote[]
   activeNoteId: string
@@ -411,6 +491,157 @@ function saveDailyNoteConfig(config: DailyNoteConfig): void {
     window.localStorage.setItem(DAILY_NOTE_CONFIG_KEY, JSON.stringify(config))
   } catch {
     // no-op: best effort persistence
+  }
+}
+
+function loadWorkspacePresets(): WorkspacePreset[] {
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_PRESETS_KEY)
+    if (!raw) {
+      return []
+    }
+    const parsed = JSON.parse(raw) as WorkspacePreset[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveWorkspacePresets(presets: WorkspacePreset[]): void {
+  try {
+    window.localStorage.setItem(WORKSPACE_PRESETS_KEY, JSON.stringify(presets))
+  } catch {
+    // no-op
+  }
+}
+
+function loadLocalHistorySnapshots(): LocalHistorySnapshot[] {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_HISTORY_KEY)
+    if (!raw) {
+      return []
+    }
+    const parsed = JSON.parse(raw) as LocalHistorySnapshot[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveLocalHistorySnapshots(snapshots: LocalHistorySnapshot[]): void {
+  try {
+    window.localStorage.setItem(LOCAL_HISTORY_KEY, JSON.stringify(snapshots))
+  } catch {
+    // no-op
+  }
+}
+
+function loadBookmarks(): BookmarkItem[] {
+  try {
+    const raw = window.localStorage.getItem(BOOKMARKS_KEY)
+    if (!raw) {
+      return []
+    }
+    const parsed = JSON.parse(raw) as BookmarkItem[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveBookmarks(bookmarks: BookmarkItem[]): void {
+  try {
+    window.localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks))
+  } catch {
+    // no-op
+  }
+}
+
+function loadTemplates(): NoteTemplate[] {
+  try {
+    const raw = window.localStorage.getItem(TEMPLATES_KEY)
+    if (!raw) {
+      return DEFAULT_TEMPLATES
+    }
+    const parsed = JSON.parse(raw) as NoteTemplate[]
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_TEMPLATES
+  } catch {
+    return DEFAULT_TEMPLATES
+  }
+}
+
+function saveTemplates(templates: NoteTemplate[]): void {
+  try {
+    window.localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates))
+  } catch {
+    // no-op
+  }
+}
+
+function loadRibbonConfig(): RibbonConfig {
+  try {
+    const raw = window.localStorage.getItem(RIBBON_CONFIG_KEY)
+    if (!raw) {
+      return DEFAULT_RIBBON_CONFIG
+    }
+    const parsed = JSON.parse(raw) as Partial<RibbonConfig>
+    return {
+      primaryActionIds:
+        parsed.primaryActionIds?.filter((id) =>
+          RIBBON_PRIMARY_ACTIONS.some((action) => action.id === id),
+        ) ?? DEFAULT_RIBBON_CONFIG.primaryActionIds,
+      secondaryActionIds:
+        parsed.secondaryActionIds?.filter((id) =>
+          RIBBON_SECONDARY_ACTIONS.some((action) => action.id === id),
+        ) ?? DEFAULT_RIBBON_CONFIG.secondaryActionIds,
+    }
+  } catch {
+    return DEFAULT_RIBBON_CONFIG
+  }
+}
+
+function saveRibbonConfig(config: RibbonConfig): void {
+  try {
+    window.localStorage.setItem(RIBBON_CONFIG_KEY, JSON.stringify(config))
+  } catch {
+    // no-op
+  }
+}
+
+function loadStackedTabs(): boolean {
+  try {
+    return window.localStorage.getItem(STACKED_TABS_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveStackedTabs(enabled: boolean): void {
+  try {
+    window.localStorage.setItem(STACKED_TABS_KEY, enabled ? '1' : '0')
+  } catch {
+    // no-op
+  }
+}
+
+function loadCanvasCards(): CanvasCard[] {
+  try {
+    const raw = window.localStorage.getItem(CANVAS_LAYOUT_KEY)
+    if (!raw) {
+      return []
+    }
+    const parsed = JSON.parse(raw) as CanvasCard[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveCanvasCards(cards: CanvasCard[]): void {
+  try {
+    window.localStorage.setItem(CANVAS_LAYOUT_KEY, JSON.stringify(cards))
+  } catch {
+    // no-op
   }
 }
 
@@ -621,6 +852,88 @@ function extractBlockAnchors(markdown: string): string[] {
     }
   }
   return [...anchors]
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function firstMatchingSnippet(content: string, term: string): string {
+  const lines = content.split('\n')
+  const normalized = term.trim().toLowerCase()
+  if (normalized) {
+    const matched = lines.find((line) => line.toLowerCase().includes(normalized))
+    if (matched) {
+      return matched.trim()
+    }
+  }
+  const fallback = lines.find((line) => line.trim() !== '')
+  return fallback?.trim() ?? ''
+}
+
+function evaluateSearchDsl(note: VaultNote, query: string): { matches: boolean; snippet: string } {
+  const rawTokens = query
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+  if (rawTokens.length === 0) {
+    return { matches: true, snippet: firstMatchingSnippet(note.content, '') }
+  }
+  const metadataFields = [
+    ...extractFrontmatterFields(note.content).map((field) => field.key.toLowerCase()),
+    ...extractInlineMetadataFields(note.content).map((field) => field.key.toLowerCase()),
+  ]
+  let snippet = ''
+
+  for (const rawToken of rawTokens) {
+    const negated = rawToken.startsWith('-')
+    const token = negated ? rawToken.slice(1) : rawToken
+    const lower = token.toLowerCase()
+    let matched = false
+
+    if (lower.startsWith('tag:')) {
+      const value = lower.slice(4)
+      matched = note.tags.some((tag) => tag.toLowerCase().includes(value.replace(/^#/, '')))
+    } else if (lower.startsWith('path:')) {
+      const value = lower.slice(5)
+      matched = note.path.toLowerCase().includes(value)
+    } else if (lower.startsWith('title:')) {
+      const value = lower.slice(6)
+      matched = note.title.toLowerCase().includes(value)
+    } else if (lower.startsWith('task:')) {
+      const value = lower.slice(5)
+      if (value === 'done') {
+        matched = /- \[[xX]\]/.test(note.content)
+      } else if (value === 'todo') {
+        matched = /- \[ \]/.test(note.content)
+      } else {
+        matched = /- \[[xX ]\]/.test(note.content)
+      }
+    } else if (lower.startsWith('property:')) {
+      const value = lower.slice(9)
+      matched = metadataFields.some((field) => field.includes(value))
+    } else if (lower.startsWith('text:')) {
+      const value = lower.slice(5)
+      matched = note.content.toLowerCase().includes(value)
+      if (matched) {
+        snippet = firstMatchingSnippet(note.content, value)
+      }
+    } else {
+      matched =
+        note.title.toLowerCase().includes(lower) ||
+        note.path.toLowerCase().includes(lower) ||
+        note.content.toLowerCase().includes(lower)
+      if (matched) {
+        snippet = firstMatchingSnippet(note.content, lower)
+      }
+    }
+
+    if (negated ? matched : !matched) {
+      return { matches: false, snippet: '' }
+    }
+  }
+
+  return { matches: true, snippet: snippet || firstMatchingSnippet(note.content, '') }
 }
 
 function formatDateByPattern(date: Date, pattern: string): string {
@@ -872,6 +1185,45 @@ function App() {
   const [quickSwitcherQuery, setQuickSwitcherQuery] = useState<string>('')
   const [graphOpen, setGraphOpen] = useState<boolean>(false)
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false)
+  const [searchModalOpen, setSearchModalOpen] = useState<boolean>(false)
+  const [searchDslQuery, setSearchDslQuery] = useState<string>('')
+  const [workspaceManagerOpen, setWorkspaceManagerOpen] = useState<boolean>(false)
+  const [workspacePresetName, setWorkspacePresetName] = useState<string>('')
+  const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false)
+  const [historyNoteId, setHistoryNoteId] = useState<string>('')
+  const [bookmarksOpen, setBookmarksOpen] = useState<boolean>(false)
+  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>(() => loadBookmarks())
+  const [templatesOpen, setTemplatesOpen] = useState<boolean>(false)
+  const [templates, setTemplates] = useState<NoteTemplate[]>(() => loadTemplates())
+  const [noteComposerOpen, setNoteComposerOpen] = useState<boolean>(false)
+  const [composerTargetId, setComposerTargetId] = useState<string>('')
+  const [composerNewTitle, setComposerNewTitle] = useState<string>('')
+  const [ribbonConfigOpen, setRibbonConfigOpen] = useState<boolean>(false)
+  const [ribbonConfig, setRibbonConfig] = useState<RibbonConfig>(() => loadRibbonConfig())
+  const [workspacePresets, setWorkspacePresets] = useState<WorkspacePreset[]>(() =>
+    loadWorkspacePresets(),
+  )
+  const [localHistorySnapshots, setLocalHistorySnapshots] = useState<LocalHistorySnapshot[]>(() =>
+    loadLocalHistorySnapshots(),
+  )
+  const [closedTabsStack, setClosedTabsStack] = useState<
+    { noteId: string; paneId: string; closedAt: number }[]
+  >([])
+  const [stackedTabs, setStackedTabs] = useState<boolean>(() => loadStackedTabs())
+  const [hoverPreview, setHoverPreview] = useState<{ noteId: string; x: number; y: number } | null>(
+    null,
+  )
+  const [basesOpen, setBasesOpen] = useState<boolean>(false)
+  const [basesQuery, setBasesQuery] = useState<string>('')
+  const [basesViewMode, setBasesViewMode] = useState<BasesViewMode>('table')
+  const [basesSortKey, setBasesSortKey] = useState<'title' | 'path' | 'updated'>('updated')
+  const [canvasOpen, setCanvasOpen] = useState<boolean>(false)
+  const [canvasCards, setCanvasCards] = useState<CanvasCard[]>(() => loadCanvasCards())
+  const [canvasDragging, setCanvasDragging] = useState<{
+    noteId: string
+    pointerOffsetX: number
+    pointerOffsetY: number
+  } | null>(null)
   const [statusLine, setStatusLine] = useState<string>('Ready')
   const [commandHistory, setCommandHistory] = useState<string[]>(bootLayout?.commandHistory ?? [])
   const [isNativeDesktop] = useState<boolean>(() => hasTauriRuntime())
@@ -898,6 +1250,7 @@ function App() {
   })
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const paneDockRef = useRef<HTMLDivElement | null>(null)
+  const canvasRef = useRef<HTMLDivElement | null>(null)
   const pendingSaves = useRef<Record<string, number>>({})
 
   const deferredExplorerQuery = useDeferredValue(explorerQuery)
@@ -914,6 +1267,7 @@ function App() {
   const activeInlineMetadata = activeNote ? extractInlineMetadataFields(activeNote.content) : []
   const activeBlockAnchors = activeNote ? extractBlockAnchors(activeNote.content) : []
   const notesById = new Map(notes.map((note) => [note.id, note]))
+  const hoverPreviewNote = hoverPreview ? (notesById.get(hoverPreview.noteId) ?? null) : null
 
   const backlinks = notes.filter((note) => {
     if (!activeNote || note.id === activeNote.id) {
@@ -970,6 +1324,86 @@ function App() {
         .map((noteId) => notesById.get(noteId))
         .filter((note): note is VaultNote => Boolean(note))
     : []
+  const unlinkedMentions = activeNote
+    ? notes
+        .filter((note) => note.id !== activeNote.id)
+        .filter((note) => {
+          const normalizedTitle = note.title.trim().toLowerCase()
+          if (!normalizedTitle || activeLinks.some((link) => link === normalizeLink(note.title))) {
+            return false
+          }
+          const linkPattern = new RegExp(`\\[\\[${escapeRegExp(note.title)}(?:[\\]|#])`, 'i')
+          if (linkPattern.test(activeNote.content)) {
+            return false
+          }
+          const mentionPattern = new RegExp(`\\b${escapeRegExp(note.title)}\\b`, 'i')
+          return mentionPattern.test(activeNote.content)
+        })
+    : []
+
+  const ribbonPrimaryActions = ribbonConfig.primaryActionIds
+    .map((id) => RIBBON_PRIMARY_ACTIONS.find((action) => action.id === id))
+    .filter((action): action is RibbonAction => Boolean(action))
+  const ribbonSecondaryActions = ribbonConfig.secondaryActionIds
+    .map((id) => RIBBON_SECONDARY_ACTIONS.find((action) => action.id === id))
+    .filter((action): action is RibbonAction => Boolean(action))
+
+  const searchResults: SearchResult[] = notes
+    .map((note) => {
+      const result = evaluateSearchDsl(note, searchDslQuery)
+      return result.matches
+        ? {
+            noteId: note.id,
+            title: note.title,
+            path: note.path,
+            snippet: result.snippet,
+          }
+        : null
+    })
+    .filter((result): result is SearchResult => result !== null)
+
+  const selectedHistoryNoteId = historyNoteId || activeNote?.id || ''
+  const historySnapshotsForSelectedNote = localHistorySnapshots
+    .filter((snapshot) => snapshot.noteId === selectedHistoryNoteId)
+    .sort((left, right) => right.timestamp - left.timestamp)
+
+  const basesRows = notes.map((note) => {
+    const words = note.content.split(/\s+/).filter(Boolean).length
+    const links = extractLinks(note.content).length
+    const frontmatterFields = extractFrontmatterFields(note.content).length
+    const inlineFields = extractInlineMetadataFields(note.content).length
+    return {
+      noteId: note.id,
+      title: note.title,
+      path: note.path,
+      updatedAt: note.updatedAt,
+      tags: note.tags.join(' '),
+      words,
+      links,
+      fields: frontmatterFields + inlineFields,
+    }
+  })
+  const filteredBasesRows = basesRows
+    .filter((row) => {
+      const query = basesQuery.trim().toLowerCase()
+      if (!query) {
+        return true
+      }
+      return (
+        row.title.toLowerCase().includes(query) ||
+        row.path.toLowerCase().includes(query) ||
+        row.tags.toLowerCase().includes(query)
+      )
+    })
+    .sort((left, right) => {
+      if (basesSortKey === 'title') {
+        return left.title.localeCompare(right.title)
+      }
+      if (basesSortKey === 'path') {
+        return left.path.localeCompare(right.path)
+      }
+      return right.updatedAt.localeCompare(left.updatedAt)
+    })
 
   const explorerItems = notes.filter((note) => {
     if (deferredExplorerQuery.trim() === '') {
@@ -998,6 +1432,149 @@ function App() {
       command.keywords.some((keyword) => keyword.includes(query))
     )
   })
+
+  function renderInlineWithLinks(line: string): React.ReactNode[] {
+    const nodes: React.ReactNode[] = []
+    const pattern = /\[\[([^[\]]+)\]\]/g
+    let cursor = 0
+    let match = pattern.exec(line)
+    while (match) {
+      const start = match.index ?? 0
+      if (start > cursor) {
+        nodes.push(line.slice(cursor, start))
+      }
+      const raw = match[1] ?? ''
+      const target = parseReferenceTarget(raw).target
+      const targetId = aliasToNoteId[target]
+      if (targetId) {
+        nodes.push(
+          <button
+            key={`link-${targetId}-${start}`}
+            type="button"
+            className="inline-link preview-link"
+            onClick={() => openNote(targetId, `wikilink:${raw}`)}
+            onMouseEnter={(event) =>
+              setHoverPreview({ noteId: targetId, x: event.clientX + 12, y: event.clientY + 12 })
+            }
+            onMouseLeave={() => setHoverPreview(null)}
+          >
+            [[{raw}]]
+          </button>,
+        )
+      } else {
+        nodes.push(`[[${raw}]]`)
+      }
+      cursor = start + match[0].length
+      match = pattern.exec(line)
+    }
+    if (cursor < line.length) {
+      nodes.push(line.slice(cursor))
+    }
+    return nodes
+  }
+
+  function renderMarkdownInteractive(markdown: string): React.ReactNode[] {
+    const lines = markdown.split('\n')
+    const nodes: React.ReactNode[] = []
+    let inCodeBlock = false
+    let codeLines: string[] = []
+    let index = 0
+
+    for (const line of lines) {
+      index += 1
+
+      if (line.startsWith('```')) {
+        if (inCodeBlock) {
+          nodes.push(
+            <pre className="md-code" key={`code-${index}`}>
+              <code>{codeLines.join('\n')}</code>
+            </pre>,
+          )
+          codeLines = []
+          inCodeBlock = false
+        } else {
+          inCodeBlock = true
+        }
+        continue
+      }
+
+      if (inCodeBlock) {
+        codeLines.push(line)
+        continue
+      }
+
+      if (line.startsWith('### ')) {
+        nodes.push(
+          <h3 className="md-h3" key={`h3-${index}`}>
+            {renderInlineWithLinks(line.slice(4))}
+          </h3>,
+        )
+        continue
+      }
+      if (line.startsWith('## ')) {
+        nodes.push(
+          <h2 className="md-h2" key={`h2-${index}`}>
+            {renderInlineWithLinks(line.slice(3))}
+          </h2>,
+        )
+        continue
+      }
+      if (line.startsWith('# ')) {
+        nodes.push(
+          <h1 className="md-h1" key={`h1-${index}`}>
+            {renderInlineWithLinks(line.slice(2))}
+          </h1>,
+        )
+        continue
+      }
+      if (line.startsWith('- [ ] ')) {
+        nodes.push(
+          <div className="md-check" key={`todo-${index}`}>
+            <input type="checkbox" readOnly checked={false} />
+            <span>{renderInlineWithLinks(line.slice(6))}</span>
+          </div>,
+        )
+        continue
+      }
+      if (line.startsWith('- [x] ') || line.startsWith('- [X] ')) {
+        nodes.push(
+          <div className="md-check" key={`done-${index}`}>
+            <input type="checkbox" readOnly checked />
+            <span>{renderInlineWithLinks(line.slice(6))}</span>
+          </div>,
+        )
+        continue
+      }
+      if (line.startsWith('- ')) {
+        nodes.push(
+          <div className="md-bullet" key={`li-${index}`}>
+            <span className="md-dot">•</span>
+            <span>{renderInlineWithLinks(line.slice(2))}</span>
+          </div>,
+        )
+        continue
+      }
+      if (line.trim() === '') {
+        nodes.push(<div className="md-gap" key={`gap-${index}`} />)
+        continue
+      }
+      nodes.push(
+        <p className="md-p" key={`p-${index}`}>
+          {renderInlineWithLinks(line)}
+        </p>,
+      )
+    }
+
+    if (codeLines.length > 0) {
+      nodes.push(
+        <pre className="md-code" key="code-tail">
+          <code>{codeLines.join('\n')}</code>
+        </pre>,
+      )
+    }
+
+    return nodes
+  }
 
   function commitPaneLayout(nextPanes: EditorPane[], nextActivePaneId?: string): void {
     const fallbackNoteId = notes[0]?.id ?? ''
@@ -1389,6 +1966,7 @@ function App() {
     }
 
     if (pane.tabIds.length <= 1 && editorPanes.length > 1) {
+      setClosedTabsStack((current) => [{ noteId, paneId, closedAt: Date.now() }, ...current].slice(0, 100))
       const remainingPanes = editorPanes.filter((item) => item.id !== pane.id)
       const focusPaneId = activePaneId === pane.id ? (remainingPanes[0]?.id ?? MAIN_EDITOR_PANE_ID) : activePaneId
       commitPaneLayout(remainingPanes, focusPaneId)
@@ -1409,7 +1987,23 @@ function App() {
       }
     })
     const focusPaneId = pane.id === activePaneId ? pane.id : activePaneId
+    setClosedTabsStack((current) => [{ noteId, paneId, closedAt: Date.now() }, ...current].slice(0, 100))
     commitPaneLayout(nextPanes, focusPaneId)
+  }
+
+  function undoCloseTab(): void {
+    const last = closedTabsStack[0]
+    if (!last) {
+      setStatusLine('No recently closed tab')
+      return
+    }
+    const destinationPane =
+      editorPanes.find((pane) => pane.id === last.paneId) ?? editorPanes[0]
+    if (!destinationPane) {
+      return
+    }
+    setClosedTabsStack((current) => current.slice(1))
+    openNote(last.noteId, 'undo close tab', false, destinationPane.id)
   }
 
   function createNote(): void {
@@ -1483,6 +2077,25 @@ function App() {
     if (!note) {
       return
     }
+    if (content !== note.content) {
+      setLocalHistorySnapshots((current) => {
+        const now = Date.now()
+        const lastForNote = current.find((snapshot) => snapshot.noteId === noteId)
+        if (lastForNote && now - lastForNote.timestamp < 45_000) {
+          return current
+        }
+        const next: LocalHistorySnapshot[] = [
+          {
+            id: `snapshot-${now}-${Math.random().toString(16).slice(2, 8)}`,
+            noteId,
+            timestamp: now,
+            content: note.content,
+          },
+          ...current,
+        ]
+        return next.slice(0, 1200)
+      })
+    }
     setNotes((current) =>
       current.map((note) =>
         note.id === noteId ? { ...note, content, updatedAt: formatNow() } : note,
@@ -1532,6 +2145,239 @@ function App() {
     }
     setNotes((current) => [newNote, ...current])
     return newNote
+  }
+
+  function linkUnlinkedMention(targetNote: VaultNote): void {
+    if (!activeNote) {
+      return
+    }
+    const mentionPattern = new RegExp(`\\b${escapeRegExp(targetNote.title)}\\b`)
+    if (!mentionPattern.test(activeNote.content)) {
+      setStatusLine(`No unlinked mention for ${targetNote.title}`)
+      return
+    }
+    const next = activeNote.content.replace(mentionPattern, `[[${targetNote.title}]]`)
+    updateNoteContent(activeNote.id, next)
+    setStatusLine(`Linked mention to ${targetNote.title}`)
+  }
+
+  function saveCurrentWorkspacePreset(name: string): void {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setStatusLine('Workspace name is required')
+      return
+    }
+    const layout: PersistedWorkspaceLayout = {
+      notes,
+      activeNoteId,
+      openTabs,
+      pinnedTabs,
+      recentNotes,
+      historyBack,
+      historyForward,
+      leftSidebarVisible,
+      rightSidebarVisible,
+      editorMode,
+      theme,
+      commandHistory,
+    }
+    const now = Date.now()
+    setWorkspacePresets((current) => {
+      const existing = current.find((preset) => preset.name.toLowerCase() === trimmed.toLowerCase())
+      const nextPreset: WorkspacePreset = {
+        id: existing?.id ?? `workspace-${now}`,
+        name: trimmed,
+        layout,
+        panes: editorPanes,
+        updatedAt: formatNow(),
+      }
+      if (existing) {
+        return current.map((preset) => (preset.id === existing.id ? nextPreset : preset))
+      }
+      return [nextPreset, ...current].slice(0, 40)
+    })
+    setWorkspacePresetName('')
+    setStatusLine(`Saved workspace preset ${trimmed}`)
+  }
+
+  function loadWorkspacePreset(presetId: string): void {
+    const preset = workspacePresets.find((entry) => entry.id === presetId)
+    if (!preset) {
+      return
+    }
+    setNotes(preset.layout.notes)
+    setPinnedTabs(preset.layout.pinnedTabs)
+    setRecentNotes(preset.layout.recentNotes)
+    setHistoryBack(preset.layout.historyBack)
+    setHistoryForward(preset.layout.historyForward)
+    setLeftSidebarVisible(preset.layout.leftSidebarVisible)
+    setRightSidebarVisible(preset.layout.rightSidebarVisible)
+    setEditorMode(preset.layout.editorMode)
+    setTheme(preset.layout.theme)
+    setCommandHistory(preset.layout.commandHistory)
+    commitPaneLayout(preset.panes, preset.panes[0]?.id ?? MAIN_EDITOR_PANE_ID)
+    setWorkspaceManagerOpen(false)
+    setStatusLine(`Loaded workspace preset ${preset.name}`)
+  }
+
+  function deleteWorkspacePreset(presetId: string): void {
+    setWorkspacePresets((current) => current.filter((preset) => preset.id !== presetId))
+  }
+
+  function restoreHistorySnapshot(snapshotId: string): void {
+    const snapshot = localHistorySnapshots.find((item) => item.id === snapshotId)
+    if (!snapshot) {
+      return
+    }
+    updateNoteContent(snapshot.noteId, snapshot.content)
+    openNote(snapshot.noteId, 'local history restore')
+    setHistoryModalOpen(false)
+    setStatusLine('Restored local history snapshot')
+  }
+
+  function insertTemplateById(templateId: string): void {
+    const template = templates.find((item) => item.id === templateId)
+    if (!template) {
+      return
+    }
+    const now = new Date()
+    const applied = template.content
+      .replaceAll('{{date}}', formatDateByPattern(now, '%Y-%m-%d'))
+      .replaceAll('{{time}}', formatNow())
+    insertAtCursor(applied, `template:${template.name}`)
+    setTemplatesOpen(false)
+  }
+
+  function addBookmarkForActiveNote(): void {
+    if (!activeNote) {
+      return
+    }
+    setBookmarks((current) => {
+      if (current.some((item) => item.type === 'note' && item.noteId === activeNote.id)) {
+        return current
+      }
+      return [
+        {
+          id: `bookmark-${Date.now()}`,
+          type: 'note',
+          label: activeNote.title,
+          noteId: activeNote.id,
+        },
+        ...current,
+      ]
+    })
+    setStatusLine(`Bookmarked ${activeNote.title}`)
+  }
+
+  function addSearchBookmark(query: string): void {
+    const trimmed = query.trim()
+    if (!trimmed) {
+      return
+    }
+    setBookmarks((current) => [
+      {
+        id: `bookmark-search-${Date.now()}`,
+        type: 'search',
+        label: `Search: ${trimmed}`,
+        query: trimmed,
+      },
+      ...current,
+    ])
+    setStatusLine('Bookmarked search query')
+  }
+
+  function removeBookmark(bookmarkId: string): void {
+    setBookmarks((current) => current.filter((item) => item.id !== bookmarkId))
+  }
+
+  function extractSelectionToNote(): void {
+    if (!activeNote) {
+      return
+    }
+    const editor = editorRef.current
+    if (!editor) {
+      setStatusLine('Select text in source mode first')
+      return
+    }
+    const start = editor.selectionStart
+    const end = editor.selectionEnd
+    if (start === end) {
+      setStatusLine('Select text to extract')
+      return
+    }
+    const selected = activeNote.content.slice(start, end)
+    const extractedTitle = composerNewTitle.trim() || `Extracted ${formatNow()}`
+    const newPath = `00 Inbox/${extractedTitle.replaceAll(/[^A-Za-z0-9 _-]/g, '').trim() || 'extracted-note'}.md`
+    const newNote = ensureNoteByPath(newPath, `# ${extractedTitle}`)
+    updateNoteContent(newNote.id, `# ${extractedTitle}\n\n${selected.trim()}\n`)
+    const replacement = `[[${newNote.title}]]`
+    const next = `${activeNote.content.slice(0, start)}${replacement}${activeNote.content.slice(end)}`
+    updateNoteContent(activeNote.id, next)
+    openNote(newNote.id, 'note composer extract')
+    setComposerNewTitle('')
+    setNoteComposerOpen(false)
+    setStatusLine(`Extracted selection to ${newNote.title}`)
+  }
+
+  function mergeActiveWithTarget(targetId: string): void {
+    if (!activeNote || !targetId || targetId === activeNote.id) {
+      return
+    }
+    const target = notesById.get(targetId)
+    if (!target) {
+      return
+    }
+    const merged = `${activeNote.content}\n\n---\n\n${target.content}`
+    updateNoteContent(activeNote.id, merged)
+    setNotes((current) => current.filter((note) => note.id !== target.id))
+    const nextPanes = editorPanes
+      .map((pane) => {
+        const nextTabs = pane.tabIds.filter((tabId) => tabId !== target.id)
+        const nextActive = pane.activeNoteId === target.id ? (nextTabs[0] ?? activeNote.id) : pane.activeNoteId
+        return { ...pane, tabIds: nextTabs, activeNoteId: nextActive }
+      })
+      .filter((pane) => pane.tabIds.length > 0)
+    commitPaneLayout(nextPanes, activePaneId)
+    setNoteComposerOpen(false)
+    setStatusLine(`Merged ${target.title} into ${activeNote.title}`)
+  }
+
+  function moveRibbonAction(
+    section: 'primary' | 'secondary',
+    actionId: string,
+    direction: -1 | 1,
+  ): void {
+    setRibbonConfig((current) => {
+      const key = section === 'primary' ? 'primaryActionIds' : 'secondaryActionIds'
+      const source = [...current[key]]
+      const index = source.indexOf(actionId)
+      if (index === -1) {
+        return current
+      }
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= source.length) {
+        return current
+      }
+      const swapped = source[targetIndex]
+      source[targetIndex] = actionId
+      source[index] = swapped
+      return {
+        ...current,
+        [key]: source,
+      }
+    })
+  }
+
+  function ensureCanvasCards(): void {
+    if (canvasCards.length > 0 || notes.length === 0) {
+      return
+    }
+    const seeded = notes.slice(0, 18).map((note, index) => ({
+      noteId: note.id,
+      x: 60 + (index % 6) * 220,
+      y: 80 + Math.floor(index / 6) * 160,
+    }))
+    setCanvasCards(seeded)
   }
 
   function openTodayDailyNote(): void {
@@ -1697,6 +2543,9 @@ function App() {
       case 'switcher:open':
         setQuickSwitcherOpen(true)
         return
+      case 'search:open-dsl':
+        setSearchModalOpen(true)
+        return
       case 'vaults:open-modal':
         setVaultModalOpen(true)
         return
@@ -1756,6 +2605,12 @@ function App() {
         setCaptureTarget('active')
         setCaptureOpen(true)
         return
+      case 'bookmarks:open':
+        setBookmarksOpen(true)
+        return
+      case 'bookmarks:add-active':
+        addBookmarkForActiveNote()
+        return
       case 'insert:callout':
         insertAtCursor('> [!info] Context\n> \n', 'callout')
         return
@@ -1767,6 +2622,41 @@ function App() {
         return
       case 'insert:task':
         insertAtCursor('- [ ] ', 'task')
+        return
+      case 'workspace:manage-presets':
+        setWorkspaceManagerOpen(true)
+        return
+      case 'editor:open-local-history':
+        setHistoryNoteId(activeNoteId)
+        setHistoryModalOpen(true)
+        return
+      case 'templates:open':
+        setTemplatesOpen(true)
+        return
+      case 'note-composer:open':
+        setComposerTargetId((current) =>
+          current || notes.find((note) => note.id !== activeNoteId)?.id || '',
+        )
+        setNoteComposerOpen(true)
+        return
+      case 'workspace:undo-close-tab':
+        undoCloseTab()
+        return
+      case 'workspace:toggle-stacked-tabs':
+        setStackedTabs((value) => !value)
+        return
+      case 'ribbon:configure':
+        setRibbonConfigOpen(true)
+        return
+      case 'bases:open':
+        setBasesOpen(true)
+        return
+      case 'canvas:open':
+        ensureCanvasCards()
+        setCanvasOpen(true)
+        return
+      case 'search:save-current':
+        addSearchBookmark(searchDslQuery)
         return
       default:
         setStatusLine(`Unknown command ${commandId}`)
@@ -1812,6 +2702,12 @@ function App() {
       name: 'Open quick switcher',
       hotkey: commandHotkey('switcher:open', 'Mod+O'),
       description: 'Find and open a note by title',
+    },
+    {
+      id: 'search:open-dsl',
+      name: 'Open search',
+      hotkey: commandHotkey('search:open-dsl', 'Mod+Shift+F'),
+      description: 'Open global search with scoped DSL filters',
     },
     {
       id: 'vaults:open-modal',
@@ -1910,6 +2806,18 @@ function App() {
       description: 'Open quick capture targeting currently active note',
     },
     {
+      id: 'bookmarks:open',
+      name: 'Open bookmarks',
+      hotkey: commandHotkey('bookmarks:open', 'Mod+Shift+B'),
+      description: 'Open bookmark manager for notes and saved searches',
+    },
+    {
+      id: 'bookmarks:add-active',
+      name: 'Bookmark active note',
+      hotkey: commandHotkey('bookmarks:add-active', 'Mod+Alt+B'),
+      description: 'Add the active note to bookmarks',
+    },
+    {
       id: 'insert:callout',
       name: 'Insert callout',
       hotkey: commandHotkey('insert:callout', 'Mod+Shift+C'),
@@ -1926,6 +2834,66 @@ function App() {
       name: 'Insert task',
       hotkey: commandHotkey('insert:task', 'Mod+Shift+T'),
       description: 'Insert checklist item at cursor',
+    },
+    {
+      id: 'workspace:manage-presets',
+      name: 'Open workspace manager',
+      hotkey: commandHotkey('workspace:manage-presets', 'Mod+Shift+W'),
+      description: 'Save, load, and delete workspace presets',
+    },
+    {
+      id: 'editor:open-local-history',
+      name: 'Open local history',
+      hotkey: commandHotkey('editor:open-local-history', 'Mod+Shift+H'),
+      description: 'Restore previous snapshots of a note',
+    },
+    {
+      id: 'templates:open',
+      name: 'Open templates',
+      hotkey: commandHotkey('templates:open', 'Mod+Shift+M'),
+      description: 'Insert reusable templates into the active note',
+    },
+    {
+      id: 'note-composer:open',
+      name: 'Open note composer',
+      hotkey: commandHotkey('note-composer:open', 'Mod+Shift+X'),
+      description: 'Extract selected text or merge notes',
+    },
+    {
+      id: 'workspace:undo-close-tab',
+      name: 'Undo close tab',
+      hotkey: commandHotkey('workspace:undo-close-tab', 'Mod+Alt+T'),
+      description: 'Reopen the most recently closed tab',
+    },
+    {
+      id: 'workspace:toggle-stacked-tabs',
+      name: 'Toggle stacked tabs',
+      hotkey: commandHotkey('workspace:toggle-stacked-tabs', 'Mod+Alt+S'),
+      description: 'Toggle wrapped tab rows like Obsidian stacked tabs',
+    },
+    {
+      id: 'ribbon:configure',
+      name: 'Configure ribbon',
+      hotkey: commandHotkey('ribbon:configure', 'Mod+Alt+R'),
+      description: 'Reorder primary and secondary ribbon actions',
+    },
+    {
+      id: 'bases:open',
+      name: 'Open bases',
+      hotkey: commandHotkey('bases:open', 'Mod+Shift+Q'),
+      description: 'Open structured note table/list/cards views',
+    },
+    {
+      id: 'canvas:open',
+      name: 'Open canvas',
+      hotkey: commandHotkey('canvas:open', 'Mod+Shift+U'),
+      description: 'Open visual card workspace for notes',
+    },
+    {
+      id: 'search:save-current',
+      name: 'Bookmark search query',
+      hotkey: commandHotkey('search:save-current', 'Mod+Alt+F'),
+      description: 'Save the current search DSL query as a bookmark',
     },
   ]
 
@@ -1948,6 +2916,34 @@ function App() {
   useEffect(() => {
     saveDailyNoteConfig(dailyNoteConfig)
   }, [dailyNoteConfig])
+
+  useEffect(() => {
+    saveWorkspacePresets(workspacePresets)
+  }, [workspacePresets])
+
+  useEffect(() => {
+    saveLocalHistorySnapshots(localHistorySnapshots)
+  }, [localHistorySnapshots])
+
+  useEffect(() => {
+    saveBookmarks(bookmarks)
+  }, [bookmarks])
+
+  useEffect(() => {
+    saveTemplates(templates)
+  }, [templates])
+
+  useEffect(() => {
+    saveRibbonConfig(ribbonConfig)
+  }, [ribbonConfig])
+
+  useEffect(() => {
+    saveStackedTabs(stackedTabs)
+  }, [stackedTabs])
+
+  useEffect(() => {
+    saveCanvasCards(canvasCards)
+  }, [canvasCards])
 
   useEffect(() => {
     void bootstrapDesktopWorkspace()
@@ -1992,6 +2988,41 @@ function App() {
   }, [paneResizeActive, editorPanes.length])
 
   useEffect(() => {
+    if (!canvasDragging) {
+      return
+    }
+    const dragState = canvasDragging
+
+    function onMouseMove(event: MouseEvent): void {
+      const canvas = canvasRef.current
+      if (!canvas) {
+        return
+      }
+      const bounds = canvas.getBoundingClientRect()
+      const nextX = event.clientX - bounds.left - dragState.pointerOffsetX
+      const nextY = event.clientY - bounds.top - dragState.pointerOffsetY
+      const clampedX = Math.max(8, Math.min(bounds.width - 220, nextX))
+      const clampedY = Math.max(8, Math.min(bounds.height - 130, nextY))
+      setCanvasCards((current) =>
+        current.map((card) =>
+          card.noteId === dragState.noteId ? { ...card, x: clampedX, y: clampedY } : card,
+        ),
+      )
+    }
+
+    function onMouseUp(): void {
+      setCanvasDragging(null)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [canvasDragging])
+
+  useEffect(() => {
     const keyboundCommands = commands
       .filter((command) => command.hotkey.trim() !== '')
       .map((command) => ({ id: command.id, hotkey: command.hotkey }))
@@ -2012,10 +3043,23 @@ function App() {
           'capture:append-inbox',
           'capture:append-daily',
           'capture:append-active-note',
+          'bookmarks:open',
+          'bookmarks:add-active',
           'daily-note:open-today',
           'insert:callout',
           'insert:decision-block',
           'insert:task',
+          'search:open-dsl',
+          'workspace:manage-presets',
+          'editor:open-local-history',
+          'templates:open',
+          'note-composer:open',
+          'workspace:undo-close-tab',
+          'workspace:toggle-stacked-tabs',
+          'ribbon:configure',
+          'bases:open',
+          'canvas:open',
+          'search:save-current',
         ]
         const matched = keyboundCommands.find((entry) => hotkeyMatches(event, entry.hotkey))
         if (matched && safeInEditor.includes(matched.id)) {
@@ -2098,11 +3142,15 @@ function App() {
         onMouseDown={() => focusPane(pane.id)}
       >
         <div
-          className={
+          className={[
+            'tabbar',
+            stackedTabs ? 'is-stacked' : '',
             tabDropTarget?.paneId === pane.id && tabDropTarget.index === pane.tabIds.length
-              ? 'tabbar is-drop-end'
-              : 'tabbar'
-          }
+              ? 'is-drop-end'
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
           onDragOver={(event) => {
             if (!draggingTab) {
               return
@@ -2270,7 +3318,7 @@ function App() {
             )}
             {(editorMode === 'preview' || editorMode === 'split') && (
               <article className="preview-pane" onMouseDown={() => focusPane(pane.id)}>
-                {renderMarkdown(paneActiveNote.content)}
+                {renderMarkdownInteractive(paneActiveNote.content)}
               </article>
             )}
             {isFocused && slashState.isOpen && editorMode !== 'preview' && (
@@ -2348,11 +3396,32 @@ function App() {
           <button type="button" onClick={() => setQuickSwitcherOpen(true)}>
             Quick Switcher
           </button>
+          <button type="button" onClick={() => setSearchModalOpen(true)}>
+            Search
+          </button>
           <button type="button" onClick={() => setCommandPaletteOpen(true)}>
             Command Palette
           </button>
+          <button type="button" onClick={() => setBookmarksOpen(true)}>
+            Bookmarks
+          </button>
+          <button type="button" onClick={() => setWorkspaceManagerOpen(true)}>
+            Workspaces
+          </button>
           <button type="button" onClick={() => setGraphOpen(true)}>
             Graph
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              ensureCanvasCards()
+              setCanvasOpen(true)
+            }}
+          >
+            Canvas
+          </button>
+          <button type="button" onClick={() => setBasesOpen(true)}>
+            Bases
           </button>
           <button type="button" onClick={() => setSettingsOpen(true)}>
             Settings
@@ -2381,7 +3450,7 @@ function App() {
       <section className="workspace-shell">
         <aside className="activity-ribbon" aria-label="Activity ribbon">
           <div className="ribbon-group">
-            {RIBBON_PRIMARY_ACTIONS.map((action) => (
+            {ribbonPrimaryActions.map((action) => (
               <button
                 key={action.id}
                 type="button"
@@ -2395,7 +3464,7 @@ function App() {
             ))}
           </div>
           <div className="ribbon-group ribbon-group-bottom">
-            {RIBBON_SECONDARY_ACTIONS.map((action) => (
+            {ribbonSecondaryActions.map((action) => (
               <button
                 key={action.id}
                 type="button"
@@ -2667,6 +3736,24 @@ function App() {
                         </li>
                       )
                     })}
+                  </ul>
+                </section>
+
+                <section className="inspector-card">
+                  <h3>Unlinked Mentions</h3>
+                  <ul>
+                    {unlinkedMentions.length === 0 && <li className="muted">No unlinked mentions</li>}
+                    {unlinkedMentions.map((note) => (
+                      <li key={`mention-${note.id}`}>
+                        <button
+                          type="button"
+                          className="inline-link"
+                          onClick={() => linkUnlinkedMention(note)}
+                        >
+                          Link {note.title}
+                        </button>
+                      </li>
+                    ))}
                   </ul>
                 </section>
 
@@ -3172,6 +4259,632 @@ function App() {
             </div>
           </section>
         </div>
+      )}
+
+      {searchModalOpen && (
+        <div className="overlay" onClick={() => setSearchModalOpen(false)} role="presentation">
+          <section
+            className="modal switcher search-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Search</h2>
+              <button type="button" onClick={() => setSearchModalOpen(false)}>
+                Close
+              </button>
+            </header>
+            <input
+              autoFocus
+              className="search-input"
+              type="text"
+              value={searchDslQuery}
+              onChange={(event) => setSearchDslQuery(event.target.value)}
+              placeholder="token search (tag:, path:, title:, task:, property:, text:)"
+            />
+            <div className="query-help">
+              <span>tag:#project</span>
+              <span>path:01 Projects</span>
+              <span>task:todo</span>
+              <span>-tag:#archive</span>
+            </div>
+            <div className="capture-actions">
+              <button
+                type="button"
+                disabled={searchDslQuery.trim() === ''}
+                onClick={() => addSearchBookmark(searchDslQuery)}
+              >
+                Bookmark Query
+              </button>
+            </div>
+            <div className="modal-list">
+              {searchResults.map((result) => (
+                <button
+                  key={`search-${result.noteId}`}
+                  type="button"
+                  className="command-row"
+                  onClick={() => {
+                    openNote(result.noteId, `search:${result.title}`)
+                    setSearchModalOpen(false)
+                  }}
+                >
+                  <div>
+                    <strong>{result.title}</strong>
+                    <p>{result.path}</p>
+                    <small>{result.snippet}</small>
+                  </div>
+                </button>
+              ))}
+              {searchResults.length === 0 && (
+                <p className="muted search-empty">No search matches for the current query.</p>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {workspaceManagerOpen && (
+        <div className="overlay" onClick={() => setWorkspaceManagerOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Workspace Manager</h2>
+              <button type="button" onClick={() => setWorkspaceManagerOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-modal-body">
+              <label className="binding-row">
+                <span>Preset Name</span>
+                <input
+                  type="text"
+                  value={workspacePresetName}
+                  onChange={(event) => setWorkspacePresetName(event.target.value)}
+                  placeholder="Sprint review context"
+                />
+              </label>
+              <div className="capture-actions">
+                <button type="button" onClick={() => saveCurrentWorkspacePreset(workspacePresetName)}>
+                  Save Current Layout
+                </button>
+              </div>
+              <section className="inspector-card">
+                <h3>Saved Workspaces</h3>
+                {workspacePresets.length === 0 && <p className="muted">No saved workspaces yet.</p>}
+                {workspacePresets.length > 0 && (
+                  <ul>
+                    {workspacePresets.map((preset) => (
+                      <li key={preset.id} className="workspace-row">
+                        <button
+                          type="button"
+                          className="inline-link"
+                          onClick={() => loadWorkspacePreset(preset.id)}
+                        >
+                          {preset.name}
+                        </button>
+                        <small>{preset.updatedAt}</small>
+                        <button type="button" onClick={() => deleteWorkspacePreset(preset.id)}>
+                          Delete
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {historyModalOpen && (
+        <div className="overlay" onClick={() => setHistoryModalOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Local History</h2>
+              <button type="button" onClick={() => setHistoryModalOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-modal-body">
+              <label className="binding-row">
+                <span>Note</span>
+                <select
+                  value={selectedHistoryNoteId}
+                  onChange={(event) => setHistoryNoteId(event.target.value)}
+                >
+                  {notes.map((note) => (
+                    <option key={`history-note-${note.id}`} value={note.id}>
+                      {note.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <section className="inspector-card">
+                <h3>Snapshots</h3>
+                {historySnapshotsForSelectedNote.length === 0 && (
+                  <p className="muted">No local history snapshots for this note yet.</p>
+                )}
+                {historySnapshotsForSelectedNote.length > 0 && (
+                  <ul>
+                    {historySnapshotsForSelectedNote.map((snapshot) => (
+                      <li key={snapshot.id} className="history-row">
+                        <div>
+                          <strong>{new Date(snapshot.timestamp).toLocaleString()}</strong>
+                          <p>{firstMatchingSnippet(snapshot.content, '')}</p>
+                        </div>
+                        <button type="button" onClick={() => restoreHistorySnapshot(snapshot.id)}>
+                          Restore
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {templatesOpen && (
+        <div className="overlay" onClick={() => setTemplatesOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Templates</h2>
+              <button type="button" onClick={() => setTemplatesOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-actions">
+              <button type="button" onClick={() => setTemplates(DEFAULT_TEMPLATES)}>
+                Reset Defaults
+              </button>
+            </div>
+            <div className="modal-list">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="command-row"
+                  onClick={() => insertTemplateById(template.id)}
+                >
+                  <div>
+                    <strong>{template.name}</strong>
+                    <small>{template.content.slice(0, 120)}</small>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {bookmarksOpen && (
+        <div className="overlay" onClick={() => setBookmarksOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Bookmarks</h2>
+              <button type="button" onClick={() => setBookmarksOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-modal-body">
+              <div className="capture-actions">
+                <button type="button" onClick={() => addBookmarkForActiveNote()}>
+                  Add Active Note
+                </button>
+              </div>
+              <section className="inspector-card">
+                <h3>Saved</h3>
+                {bookmarks.length === 0 && <p className="muted">No bookmarks saved.</p>}
+                {bookmarks.length > 0 && (
+                  <ul>
+                    {bookmarks.map((bookmark) => (
+                      <li key={bookmark.id} className="bookmark-row">
+                        <button
+                          type="button"
+                          className="inline-link"
+                          onClick={() => {
+                            if (bookmark.type === 'note' && bookmark.noteId) {
+                              openNote(bookmark.noteId, `bookmark:${bookmark.label}`)
+                              setBookmarksOpen(false)
+                              return
+                            }
+                            if (bookmark.type === 'search' && bookmark.query) {
+                              setSearchDslQuery(bookmark.query)
+                              setSearchModalOpen(true)
+                              setBookmarksOpen(false)
+                            }
+                          }}
+                        >
+                          {bookmark.label}
+                        </button>
+                        <button type="button" onClick={() => removeBookmark(bookmark.id)}>
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {noteComposerOpen && (
+        <div className="overlay" onClick={() => setNoteComposerOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Note Composer</h2>
+              <button type="button" onClick={() => setNoteComposerOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-modal-body">
+              <section className="inspector-card">
+                <h3>Extract Selection</h3>
+                <label className="binding-row">
+                  <span>New Note Title</span>
+                  <input
+                    type="text"
+                    value={composerNewTitle}
+                    onChange={(event) => setComposerNewTitle(event.target.value)}
+                    placeholder="Architecture decision details"
+                  />
+                </label>
+                <div className="capture-actions">
+                  <button type="button" onClick={() => extractSelectionToNote()}>
+                    Extract to New Note
+                  </button>
+                </div>
+              </section>
+              <section className="inspector-card">
+                <h3>Merge Another Note into Active</h3>
+                <label className="binding-row">
+                  <span>Merge Source</span>
+                  <select
+                    value={composerTargetId}
+                    onChange={(event) => setComposerTargetId(event.target.value)}
+                  >
+                    <option value="">Select note</option>
+                    {notes
+                      .filter((note) => note.id !== activeNoteId)
+                      .map((note) => (
+                        <option key={`composer-${note.id}`} value={note.id}>
+                          {note.title}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <div className="capture-actions">
+                  <button
+                    type="button"
+                    disabled={!composerTargetId}
+                    onClick={() => mergeActiveWithTarget(composerTargetId)}
+                  >
+                    Merge
+                  </button>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {ribbonConfigOpen && (
+        <div className="overlay" onClick={() => setRibbonConfigOpen(false)} role="presentation">
+          <section
+            className="modal switcher"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Ribbon Configuration</h2>
+              <button type="button" onClick={() => setRibbonConfigOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="capture-modal-body ribbon-config-grid">
+              <section className="inspector-card">
+                <h3>Primary Ribbon</h3>
+                <ul>
+                  {ribbonPrimaryActions.map((action) => (
+                    <li key={`ribbon-primary-${action.id}`} className="ribbon-config-row">
+                      <span>
+                        {action.glyph} {action.label}
+                      </span>
+                      <div className="ribbon-config-actions">
+                        <button
+                          type="button"
+                          onClick={() => moveRibbonAction('primary', action.id, -1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveRibbonAction('primary', action.id, 1)}
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              <section className="inspector-card">
+                <h3>Bottom Ribbon</h3>
+                <ul>
+                  {ribbonSecondaryActions.map((action) => (
+                    <li key={`ribbon-secondary-${action.id}`} className="ribbon-config-row">
+                      <span>
+                        {action.glyph} {action.label}
+                      </span>
+                      <div className="ribbon-config-actions">
+                        <button
+                          type="button"
+                          onClick={() => moveRibbonAction('secondary', action.id, -1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveRibbonAction('secondary', action.id, 1)}
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {basesOpen && (
+        <div className="overlay" onClick={() => setBasesOpen(false)} role="presentation">
+          <section
+            className="modal settings-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Bases</h2>
+              <button type="button" onClick={() => setBasesOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="bases-toolbar">
+              <input
+                className="search-input"
+                type="text"
+                value={basesQuery}
+                onChange={(event) => setBasesQuery(event.target.value)}
+                placeholder="Filter by title, path, or tag"
+              />
+              <select
+                value={basesViewMode}
+                onChange={(event) => setBasesViewMode(event.target.value as BasesViewMode)}
+              >
+                <option value="table">Table</option>
+                <option value="list">List</option>
+                <option value="cards">Cards</option>
+              </select>
+              <select
+                value={basesSortKey}
+                onChange={(event) =>
+                  setBasesSortKey(event.target.value as 'title' | 'path' | 'updated')
+                }
+              >
+                <option value="updated">Sort by updated</option>
+                <option value="title">Sort by title</option>
+                <option value="path">Sort by path</option>
+              </select>
+            </div>
+            <div className="bases-body">
+              {basesViewMode === 'table' && (
+                <div className="bases-table-wrap">
+                  <table className="bases-table">
+                    <thead>
+                      <tr>
+                        <th>Title</th>
+                        <th>Path</th>
+                        <th>Tags</th>
+                        <th>Words</th>
+                        <th>Links</th>
+                        <th>Fields</th>
+                        <th>Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBasesRows.map((row) => (
+                        <tr key={`base-row-${row.noteId}`}>
+                          <td>
+                            <button
+                              type="button"
+                              className="inline-link"
+                              onClick={() => {
+                                openNote(row.noteId, `bases:${row.title}`)
+                                setBasesOpen(false)
+                              }}
+                            >
+                              {row.title}
+                            </button>
+                          </td>
+                          <td>{row.path}</td>
+                          <td>{row.tags}</td>
+                          <td>{row.words}</td>
+                          <td>{row.links}</td>
+                          <td>{row.fields}</td>
+                          <td>{row.updatedAt}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {basesViewMode === 'list' && (
+                <div className="bases-list">
+                  {filteredBasesRows.map((row) => (
+                    <button
+                      key={`base-list-${row.noteId}`}
+                      type="button"
+                      className="graph-node-row"
+                      onClick={() => {
+                        openNote(row.noteId, `bases:${row.title}`)
+                        setBasesOpen(false)
+                      }}
+                    >
+                      <span>{row.title}</span>
+                      <span className="graph-pill">{row.path}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {basesViewMode === 'cards' && (
+                <div className="bases-cards">
+                  {filteredBasesRows.map((row) => (
+                    <button
+                      key={`base-card-${row.noteId}`}
+                      type="button"
+                      className="bases-card"
+                      onClick={() => {
+                        openNote(row.noteId, `bases:${row.title}`)
+                        setBasesOpen(false)
+                      }}
+                    >
+                      <strong>{row.title}</strong>
+                      <small>{row.path}</small>
+                      <span>
+                        {row.words} words • {row.links} links • {row.fields} fields
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {canvasOpen && (
+        <div className="overlay" onClick={() => setCanvasOpen(false)} role="presentation">
+          <section
+            className="modal canvas-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header>
+              <h2>Canvas</h2>
+              <button type="button" onClick={() => setCanvasOpen(false)}>
+                Close
+              </button>
+            </header>
+            <div className="canvas-toolbar">
+              <span>{canvasCards.length} cards</span>
+              <button
+                type="button"
+                onClick={() => {
+                  ensureCanvasCards()
+                  setStatusLine('Seeded canvas with note cards')
+                }}
+              >
+                Seed Cards
+              </button>
+            </div>
+            <div className="canvas-surface" ref={canvasRef}>
+              {canvasCards.map((card) => {
+                const note = notesById.get(card.noteId)
+                if (!note) {
+                  return null
+                }
+                return (
+                  <article
+                    key={`canvas-${card.noteId}`}
+                    className="canvas-card"
+                    style={{ left: `${card.x}px`, top: `${card.y}px` }}
+                    onMouseDown={(event) => {
+                      const bounds = event.currentTarget.getBoundingClientRect()
+                      setCanvasDragging({
+                        noteId: card.noteId,
+                        pointerOffsetX: event.clientX - bounds.left,
+                        pointerOffsetY: event.clientY - bounds.top,
+                      })
+                    }}
+                    onDoubleClick={() => {
+                      openNote(card.noteId, `canvas:${note.title}`)
+                      setCanvasOpen(false)
+                    }}
+                  >
+                    <h3>{note.title}</h3>
+                    <p>{note.path}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openNote(card.noteId, `canvas:${note.title}`)
+                        setCanvasOpen(false)
+                      }}
+                    >
+                      Open
+                    </button>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {hoverPreview && hoverPreviewNote && (
+        <aside
+          className="hover-preview"
+          style={{
+            left: hoverPreview.x,
+            top: hoverPreview.y,
+          }}
+        >
+          <header>
+            <strong>{hoverPreviewNote.title}</strong>
+            <small>{hoverPreviewNote.path}</small>
+          </header>
+          <div className="hover-preview-body">
+            {renderMarkdown(
+              hoverPreviewNote.content
+                .split('\n')
+                .slice(0, 14)
+                .join('\n'),
+            )}
+          </div>
+        </aside>
       )}
     </main>
   )

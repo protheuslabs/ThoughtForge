@@ -1,6 +1,6 @@
 # SRS Execution Matrix
 
-Generated from `docs/SRS.md` at `2026-03-24T21:40:32Z`.
+Generated from `docs/SRS.md` at `2026-03-25T20:01:48Z`.
 
 Legend:
 - `todo`: not started
@@ -46,6 +46,16 @@ Legend:
 | `FR-ED-016` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support per-command keybinding customization with durable persistence. |
 | `FR-ED-017` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should provide dedicated outgoing-links and backlinks inspector panels for the active note or object. |
 | `FR-ED-018` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support recent-files and navigation-history jumps in the workspace. |
+| `FR-ED-019` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should surface unlinked mentions for the active note and support one-click conversion to wikilinks. |
+| `FR-ED-020` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support named workspace presets that capture tabs, panes, active note, and shell visibility state. |
+| `FR-ED-021` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should maintain local history snapshots for notes and allow point-in-time restore. |
+| `FR-ED-022` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support reusable note templates with token substitution for date/time insertion. |
+| `FR-ED-023` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should include a note composer for extract-to-note and merge-note workflows. |
+| `FR-ED-024` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should provide hover previews for linked notes in preview mode. |
+| `FR-ED-025` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should support undo-close-tab and stacked-tab display modes. |
+| `FR-ED-026` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should allow customizable ordering of ribbon actions. |
+| `FR-ED-027` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should provide an Obsidian-aligned desktop shell layout baseline. |
+| `FR-ED-028` | `Should` | M1 - Vault and Capture Foundation | `done` | The system should include a canvas workspace with draggable note cards. |
 | `FR-CX-001` | `Must` | M2 - Context and Memory Model | `todo` | The system shall support first-class context objects for `Intent`, `Project`, `Task`, `Decision`, `Commitment`, `Assumption`, `OpenQuestion`, `Entity`, `Resource`, `Constraint`, `Conversation`, `Delegation`, `Approval`, and `StateDelta`. |
 | `FR-CX-002` | `Must` | M2 - Context and Memory Model | `todo` | The system shall assign stable internal identifiers to all context objects. |
 | `FR-CX-003` | `Must` | M2 - Context and Memory Model | `todo` | The system shall support explicit relationships between context objects and evidence items. |
@@ -93,6 +103,9 @@ Legend:
 | `FR-SR-009` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should surface maintenance-oriented queues and views for stale, uncategorized, orphaned, duplicate, or review-needed workspace state. |
 | `FR-SR-010` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support project startup and operating templates that create recommended views, dossiers, and object scaffolds for common workflows. |
 | `FR-SR-011` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support interactive global and local graph views for notes, objects, and relationships. |
+| `FR-SR-012` | `Should` | M4 - Retrieval and Knowledge Graph | `done` | The system should support scoped lexical search tokens for path, title, tags, task state, property keys, and full text. |
+| `FR-SR-013` | `Should` | M4 - Retrieval and Knowledge Graph | `done` | The system should support bookmarkable searches and note bookmarks in one manager. |
+| `FR-SR-014` | `Should` | M4 - Retrieval and Knowledge Graph | `done` | The system should support structured note bases with table, list, and card views. |
 | `FR-KG-001` | `Must` | M4 - Retrieval and Knowledge Graph | `todo` | The system shall construct a graph from wikilinks, embeds, tags, references, and typed object relationships. |
 | `FR-KG-002` | `Must` | M4 - Retrieval and Knowledge Graph | `todo` | The system shall maintain extracted entities, aliases, and relationships as a projection layer. |
 | `FR-KG-003` | `Should` | M4 - Retrieval and Knowledge Graph | `todo` | The system should support user-defined entity types such as person, project, idea, task, system, and goal. |
