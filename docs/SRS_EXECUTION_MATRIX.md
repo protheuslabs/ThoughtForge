@@ -1,6 +1,6 @@
 # SRS Execution Matrix
 
-Generated from `docs/SRS.md` at `2026-03-25T20:01:48Z`.
+Generated from `docs/SRS.md` at `2026-05-30T19:39:20Z`.
 
 Legend:
 - `todo`: not started
@@ -141,6 +141,7 @@ Legend:
 | `FR-SC-003` | `Should` | M7 - Sync and Collaboration | `todo` | The system should support CRDT-backed collaboration for selected notes or workspaces. |
 | `FR-SC-004` | `Should` | M7 - Sync and Collaboration | `todo` | The system should support sync adapters rather than a hard-coded sync backend. |
 | `FR-SC-005` | `Could` | M7 - Sync and Collaboration | `todo` | The system could support presence, cursors, and shared sessions. |
+| `FR-SC-006` | `Could` | M7 - Sync and Collaboration | `todo` | The system should support a mobile collaboration companion experience with conflict-tolerant sync and task/status updates. |
 | `FR-IE-001` | `Must` | M8 - Interop and CLI | `todo` | The system shall import existing Markdown vaults with minimal restructuring. |
 | `FR-IE-002` | `Must` | M8 - Interop and CLI | `todo` | The system shall export authored evidence and attachments without vendor lock-in. |
 | `FR-IE-003` | `Should` | M8 - Interop and CLI | `todo` | The system should import metadata from common PKM formats such as frontmatter and task syntaxes. |
@@ -153,6 +154,8 @@ Legend:
 | `FR-IE-010` | `Should` | M8 - Interop and CLI | `todo` | The system should support user-controlled theme packages and CSS snippet overlays in workspace configuration. |
 | `FR-IE-011` | `Should` | M8 - Interop and CLI | `todo` | The system should support startup safe mode that loads only core plugins and disables third-party extensions. |
 | `FR-IE-012` | `Should` | M8 - Interop and CLI | `done` | The desktop app should expose typed invoke commands for bootstrap, vault lifecycle, note lifecycle, and capture flows. |
+| `FR-IE-013` | `Could` | M8 - Interop and CLI | `todo` | The system should support read-only publishing paths for notes, projects, or workspaces with safe redaction and privacy controls. |
+| `FR-IE-014` | `Could` | M8 - Interop and CLI | `todo` | The system should support mobile companion modes for safe read-only browsing, search, and lightweight review. |
 | `FR-SP-001` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall require explicit user approval for destructive or external side-effecting agent actions. |
 | `FR-SP-002` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall separate trusted core code from less-trusted frontend and plugin execution contexts. |
 | `FR-SP-003` | `Must` | M9 - Trust, Safety, and Evaluation | `todo` | The system shall support provider-level data sharing controls. |

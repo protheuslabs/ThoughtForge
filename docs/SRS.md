@@ -533,6 +533,8 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 
 - FR-SC-005 (Could): The system could support presence, cursors, and shared sessions.
   Acceptance: Live co-editing state is visible in collaborative mode.
+- FR-SC-006 (Could): The system should support a mobile collaboration companion experience with conflict-tolerant sync and task/status updates.
+  Acceptance: A mobile user can open workspace snapshots, review work, and push updates safely through conflict-aware sync.
 
 ### 9.15 Import, Export, and Interoperability
 
@@ -571,6 +573,12 @@ The system also acts as a workspace steward. It should detect decay such as inbo
 
 - FR-IE-012 (Should): The desktop app should expose typed invoke commands for bootstrap, vault lifecycle, note lifecycle, and capture flows.
   Acceptance: The desktop UI can call stable runtime commands to load workspace state and execute file-safe operations.
+
+- FR-IE-013 (Could): The system should support read-only publishing paths for notes, projects, or workspaces with safe redaction and privacy controls.
+  Acceptance: A user can generate a shareable read-only package or link while excluding sensitive notes, metadata, and secrets.
+
+- FR-IE-014 (Could): The system should support mobile companion modes for safe read-only browsing, search, and lightweight review.
+  Acceptance: A mobile workflow can open synced workspace snapshots, inspect context, and submit triage actions without full editor parity.
 
 ### 9.16 Security, Permissions, and Privacy
 
